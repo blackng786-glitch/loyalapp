@@ -466,10 +466,15 @@ async function doRegister() {
 
 // ── LOAD ACTIVITY ─────────────────────────────────────────────
 async function loadActivity() {
-  const res = await fetch(`${API}/api/member/${S.member.id}/activity`);
-  const data = await res.json();
-  S.stamps = data.stamps || [];
-  S.redemptions = data.redemptions || [];
+  try {
+    const res = await fetch(`${API}/api/member/${S.member.id}/activity`);
+    const data = await res.json();
+    S.stamps = data.stamps || [];
+    S.redemptions = data.redemptions || [];
+  } catch(e) {
+    S.stamps = [];
+    S.redemptions = [];
+  }
 }
 
 // ── RENDER MEMBER VIEW ────────────────────────────────────────
