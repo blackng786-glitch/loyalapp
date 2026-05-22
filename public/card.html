@@ -549,7 +549,15 @@ function renderHistory() {
 
 function renderQR() {
   $('qr-label').textContent = S.member.phone;
-  QRCode.toCanvas($('qr-canvas'), S.member.phone, {width:148,margin:0,color:{dark:'#0A0A0A',light:'#ffffff'}});
+  const canvas = $('qr-canvas');
+  canvas.innerHTML = '';
+  new QRCode(canvas, {
+    text: S.member.phone,
+    width: 148,
+    height: 148,
+    colorDark: '#0A0A0A',
+    colorLight: '#ffffff',
+  });
 }
 
 function renderPushSection() {
