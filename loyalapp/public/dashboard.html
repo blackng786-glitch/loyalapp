@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LoyalApp · Merchant Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --gold:#C9A84C;--bg:#0A0A0A;--s1:#141414;--s2:#1C1C1C;--s3:#242424;
+  --b1:#1E1E1E;--b2:#2A2A2A;--b3:#3A3A3A;--t1:#F0EDE6;--t2:#9A9590;--t3:#585450;
+  --r:12px;--rs:8px;--green:#4A9E6A;
+}
+html,body{min-height:100%;background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-size:15px}
+input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:pointer}
+
+.app{display:flex;flex-direction:column;min-height:100vh}
+.view{display:none;flex:1;flex-direction:column}
+.view.on{display:flex}
+
+/* NAV */
+.nav{padding:13px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--b1);background:rgba(10,10,10,0.96);position:sticky;top:0;z-index:50;backdrop-filter:blur(12px)}
+.nav-brand{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;color:var(--gold)}
+.nav-right{display:flex;align-items:center;gap:10px}
+.nav-user{font-size:13px;color:var(--t2)}
+.nav-btn{background:transparent;border:1px solid var(--b3);border-radius:20px;padding:5px 14px;color:var(--t2);font-size:12px;transition:all .2s}
+.nav-btn:hover{color:var(--t1)}
+
+/* LAYOUT */
+.page-wrap{max-width:900px;margin:0 auto;width:100%;padding:28px 24px 60px}
+.page-title{font-size:22px;font-weight:500;margin-bottom:4px}
+.page-sub{font-size:13px;color:var(--t2);margin-bottom:28px}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:12px 20px;border-radius:var(--rs);border:none;font-size:14px;font-weight:500;transition:all .2s;cursor:pointer}
+.btn:disabled{opacity:0.4;cursor:not-allowed}
+.btn-gold{background:var(--gold);color:#0A0A0A;width:100%}
+.btn-gold:hover:not(:disabled){background:#E8C97A}
+.btn-outline{background:transparent;border:1px solid var(--b3);color:var(--t2)}
+.btn-outline:hover{color:var(--t1);border-color:var(--b3)}
+.btn-sm{padding:7px 14px;font-size:13px;font-weight:400}
+.btn-danger{background:rgba(192,57,43,0.15);border:1px solid rgba(192,57,43,0.3);color:#E74C3C}
+
+/* INPUTS */
+.input{width:100%;padding:12px 14px;background:var(--s1);border:1px solid var(--b2);border-radius:var(--rs);color:var(--t1);font-size:14px;outline:none;transition:border .2s;-webkit-appearance:none}
+.input:focus{border-color:var(--gold)}
+.input::placeholder{color:var(--t3)}
+.label{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;display:block}
+.field{margin-bottom:16px}
+.hint{font-size:11px;color:var(--t3);margin-top:5px}
+
+/* CARDS */
+.card{background:var(--s1);border:1px solid var(--b2);border-radius:var(--r);padding:20px;margin-bottom:16px}
+.card-title{font-size:14px;font-weight:500;margin-bottom:4px}
+.card-sub{font-size:12px;color:var(--t2);margin-bottom:16px}
+
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+.stat{background:var(--s1);border:1px solid var(--b2);border-radius:var(--r);padding:16px}
+.stat-lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px}
+.stat-val{font-family:'Bebas Neue',sans-serif;font-size:34px;color:var(--gold);line-height:1}
+.stat-sub{font-size:11px;color:var(--t3);margin-top:4px}
+
+/* LINKS TABLE */
+.links-table{width:100%;border-collapse:collapse}
+.links-table th{text-align:left;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--t3);padding:0 0 10px;font-weight:400;border-bottom:1px solid var(--b2)}
+.links-table td{padding:12px 0;border-bottom:1px solid var(--b1);font-size:13px;vertical-align:middle}
+.links-table tr:last-child td{border-bottom:none}
+.link-url{font-family:'DM Mono',monospace;font-size:12px;color:var(--gold);background:var(--s2);padding:4px 10px;border-radius:6px;display:inline-block;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.copy-btn{background:transparent;border:1px solid var(--b2);border-radius:6px;padding:4px 10px;color:var(--t2);font-size:11px;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:4px;margin-left:8px}
+.copy-btn:hover{border-color:var(--gold);color:var(--gold)}
+
+/* ACTIVITY */
+.act-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--b1)}
+.act-row:last-child{border-bottom:none}
+.act-ico{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:rgba(201,168,76,0.1);flex-shrink:0}
+.act-ico i{color:var(--gold);font-size:14px}
+.act-info{flex:1;min-width:0}
+.act-name{font-size:13px}
+.act-detail{font-size:11px;color:var(--t3)}
+.act-time{font-size:11px;color:var(--t3);font-family:'DM Mono',monospace}
+
+/* COLOR PICKER */
+.color-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+.color-opt{width:36px;height:36px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:all .2s}
+.color-opt.on{border-color:var(--t1);transform:scale(1.1)}
+
+/* PUSH */
+.push-preview{background:var(--s2);border:1px solid var(--b2);border-radius:var(--rs);padding:14px;margin-bottom:14px}
+.push-notif{background:var(--s3);border-radius:8px;padding:10px 12px;font-size:12px}
+.push-notif-title{font-weight:500;margin-bottom:2px}
+.push-notif-body{color:var(--t2)}
+
+/* TAGS */
+.tag{display:inline-flex;align-items:center;gap:6px;background:var(--s2);border:1px solid var(--b2);border-radius:6px;padding:4px 10px;font-size:12px;color:var(--t2);margin:3px}
+.tag button{background:none;border:none;color:var(--t3);cursor:pointer;font-size:14px;line-height:1;padding:0}
+
+/* PLAN BADGE */
+.plan-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;letter-spacing:1px;text-transform:uppercase}
+.plan-free{background:rgba(90,90,80,0.2);color:var(--t3)}
+.plan-basic{background:rgba(201,168,76,0.12);color:var(--gold);border:1px solid rgba(201,168,76,0.25)}
+.plan-pro{background:rgba(52,152,219,0.12);color:#5dade2;border:1px solid rgba(52,152,219,0.25)}
+
+.toast{position:fixed;bottom:22px;right:24px;background:var(--s2);border:1px solid rgba(201,168,76,0.4);border-radius:10px;padding:10px 18px;font-size:13px;color:var(--gold);transition:all .25s;z-index:200;pointer-events:none;opacity:0;transform:translateY(8px)}
+.toast.on{opacity:1;transform:translateY(0)}
+.loader{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--t3)}
+.loader i{animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.divider{height:1px;background:var(--b1);margin:24px 0}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:600px){.two-col{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- AUTH VIEW -->
+<div id="v-auth" class="view on">
+  <nav class="nav"><div class="nav-brand">LOYALAPP</div><div style="font-size:13px;color:var(--t3)">Merchant Portal</div></nav>
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px">
+    <div style="width:100%;max-width:380px">
+      <div style="text-align:center;margin-bottom:32px">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:40px;letter-spacing:4px;color:var(--gold)">LOYALAPP</div>
+        <div style="font-size:13px;color:var(--t3);margin-top:4px">Sign in to your merchant account</div>
+      </div>
+      <div id="auth-form" style="display:flex;flex-direction:column;gap:12px">
+        <div>
+          <label class="label" for="auth-email">Email</label>
+          <input class="input" id="auth-email" type="email" placeholder="you@business.com" autocomplete="email">
+        </div>
+        <div>
+          <label class="label" for="auth-pass">Password</label>
+          <input class="input" id="auth-pass" type="password" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <button class="btn btn-gold" id="signin-btn" onclick="signIn()" style="margin-top:4px">
+          <i class="ti ti-arrow-right" aria-hidden="true"></i> Sign In
+        </button>
+        <div style="text-align:center">
+          <button style="background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;text-decoration:underline" onclick="toggleSignup()">New merchant? Create account</button>
+        </div>
+      </div>
+      <div id="signup-form" style="display:none;flex-direction:column;gap:12px">
+        <div>
+          <label class="label" for="su-email">Email</label>
+          <input class="input" id="su-email" type="email" placeholder="you@business.com">
+        </div>
+        <div>
+          <label class="label" for="su-pass">Password</label>
+          <input class="input" id="su-pass" type="password" placeholder="Min. 8 characters">
+        </div>
+        <button class="btn btn-gold" id="signup-btn" onclick="signUp()">
+          <i class="ti ti-user-plus" aria-hidden="true"></i> Create Account
+        </button>
+        <div style="text-align:center">
+          <button style="background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;text-decoration:underline" onclick="toggleSignup()">Already have an account? Sign in</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SETUP WIZARD -->
+<div id="v-setup" class="view">
+  <nav class="nav"><div class="nav-brand">LOYALAPP</div><div style="font-size:13px;color:var(--t3)">Setup Wizard</div></nav>
+  <div class="page-wrap" style="max-width:560px">
+    <div class="page-title">Set up your loyalty program</div>
+    <div class="page-sub">Takes 2 minutes — no technical knowledge needed</div>
+
+    <!-- STEP 1: Business Info -->
+    <div class="card">
+      <div class="card-title"><i class="ti ti-building-store" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>Business Info</div>
+      <div class="card-sub">Basic details about your business</div>
+      <div class="two-col">
+        <div class="field"><label class="label">Business Name</label><input class="input" id="w-name" type="text" placeholder="Neue Car Spa"></div>
+        <div class="field">
+          <label class="label">Slug (URL ID) <span style="color:var(--t3)">no spaces</span></label>
+          <input class="input" id="w-slug" type="text" placeholder="neue-car-spa" oninput="slugify(this)">
+          <div class="hint">loyalapp.com/card?m=<span id="slug-preview" style="color:var(--gold)">your-slug</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2: Card Design -->
+    <div class="card">
+      <div class="card-title"><i class="ti ti-palette" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>Card Design</div>
+      <div class="card-sub">How your loyalty card looks to customers</div>
+      <div class="two-col">
+        <div class="field">
+          <label class="label">Short Brand Name <span style="color:var(--t3)">(on card)</span></label>
+          <input class="input" id="w-logo" type="text" placeholder="NEUE" maxlength="10">
+        </div>
+        <div class="field">
+          <label class="label">Brand Color</label>
+          <input class="input" id="w-color" type="color" value="#C9A84C" style="height:46px;padding:4px 8px;cursor:pointer">
+          <div class="color-row">
+            <div class="color-opt on" style="background:#C9A84C" onclick="setColor('#C9A84C',this)"></div>
+            <div class="color-opt" style="background:#2ECC71" onclick="setColor('#2ECC71',this)"></div>
+            <div class="color-opt" style="background:#3498DB" onclick="setColor('#3498DB',this)"></div>
+            <div class="color-opt" style="background:#E74C3C" onclick="setColor('#E74C3C',this)"></div>
+            <div class="color-opt" style="background:#9B59B6" onclick="setColor('#9B59B6',this)"></div>
+            <div class="color-opt" style="background:#E67E22" onclick="setColor('#E67E22',this)"></div>
+            <div class="color-opt" style="background:#1ABC9C" onclick="setColor('#1ABC9C',this)"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3: Stamp Program -->
+    <div class="card">
+      <div class="card-title"><i class="ti ti-star" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>Stamp Program</div>
+      <div class="card-sub">Configure how customers earn and redeem rewards</div>
+      <div class="two-col">
+        <div class="field">
+          <label class="label">Stamps per card</label>
+          <select class="input" id="w-stamps">
+            <option value="5">5 stamps</option>
+            <option value="8">8 stamps</option>
+            <option value="10" selected>10 stamps</option>
+            <option value="12">12 stamps</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="label">Reward Name</label>
+          <input class="input" id="w-reward" type="text" placeholder="Free Basic Wash">
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">Reward Value <span style="color:var(--t3)">(optional)</span></label>
+        <input class="input" id="w-reward-val" type="text" placeholder="RM35 value">
+      </div>
+    </div>
+
+    <!-- STEP 4: Services -->
+    <div class="card">
+      <div class="card-title"><i class="ti ti-list" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>Services</div>
+      <div class="card-sub">Add the services your staff can select when stamping</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input class="input" id="svc-input" type="text" placeholder="e.g. Basic Wash (RM35)" style="flex:1" onkeydown="if(event.key==='Enter')addSvc()">
+        <button class="btn btn-outline btn-sm" onclick="addSvc()" style="white-space:nowrap"><i class="ti ti-plus" aria-hidden="true"></i> Add</button>
+      </div>
+      <div id="svc-tags"></div>
+    </div>
+
+    <!-- STEP 5: Staff PIN -->
+    <div class="card">
+      <div class="card-title"><i class="ti ti-lock" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>Staff PIN</div>
+      <div class="card-sub">Your staff will use this PIN to log into the stamp panel</div>
+      <div class="field">
+        <label class="label">Staff PIN (4 digits)</label>
+        <input class="input" id="w-pin" type="tel" placeholder="1234" maxlength="4" inputmode="numeric" style="max-width:140px">
+        <div class="hint">You can add more staff accounts later</div>
+      </div>
+    </div>
+
+    <button class="btn btn-gold" id="setup-btn" onclick="doSetup()">
+      <i class="ti ti-rocket" aria-hidden="true"></i> Launch My Loyalty Program
+    </button>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="v-dashboard" class="view">
+  <nav class="nav">
+    <div class="nav-brand">LOYALAPP</div>
+    <div class="nav-right">
+      <div class="nav-user" id="nav-biz"></div>
+      <span id="nav-plan" class="plan-badge plan-free">Free</span>
+      <button class="nav-btn" onclick="signOut()"><i class="ti ti-logout" aria-hidden="true"></i> Sign out</button>
+    </div>
+  </nav>
+
+  <div class="page-wrap">
+    <!-- LINKS -->
+    <div class="card" style="border-color:rgba(201,168,76,0.3)">
+      <div class="card-title">Your Links</div>
+      <div class="card-sub">Share these with customers and staff</div>
+      <table class="links-table">
+        <thead><tr><th>Page</th><th>URL</th><th></th></tr></thead>
+        <tbody>
+          <tr>
+            <td><i class="ti ti-wallet" style="margin-right:6px;color:var(--gold);font-size:14px;vertical-align:-2px" aria-hidden="true"></i>Member Card</td>
+            <td><span class="link-url" id="link-card">—</span></td>
+            <td><button class="copy-btn" onclick="copyLink('link-card')"><i class="ti ti-copy" aria-hidden="true"></i> Copy</button></td>
+          </tr>
+          <tr>
+            <td><i class="ti ti-users" style="margin-right:6px;color:var(--gold);font-size:14px;vertical-align:-2px" aria-hidden="true"></i>Staff Panel</td>
+            <td><span class="link-url" id="link-staff">—</span></td>
+            <td><button class="copy-btn" onclick="copyLink('link-staff')"><i class="ti ti-copy" aria-hidden="true"></i> Copy</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats-grid">
+      <div class="stat"><div class="stat-lbl">Total Members</div><div class="stat-val" id="d-members">—</div></div>
+      <div class="stat"><div class="stat-lbl">Stamps Today</div><div class="stat-val" id="d-today">—</div></div>
+      <div class="stat"><div class="stat-lbl">This Week</div><div class="stat-val" id="d-week">—</div><div class="stat-sub">stamps</div></div>
+      <div class="stat"><div class="stat-lbl">Redemptions</div><div class="stat-val" id="d-redeem">—</div><div class="stat-sub">this week</div></div>
+    </div>
+
+    <!-- PUSH NOTIFICATION -->
+    <div class="card">
+      <div class="card-title"><i class="ti ti-bell" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>Send Push Notification</div>
+      <div class="card-sub">Notify all your members instantly — promotions, reminders, announcements</div>
+      <div class="field">
+        <label class="label">Title</label>
+        <input class="input" id="push-title" type="text" placeholder="Weekend Promo!" oninput="updatePreview()">
+      </div>
+      <div class="field">
+        <label class="label">Message</label>
+        <input class="input" id="push-body" type="text" placeholder="Get 20% off all services this Saturday only" oninput="updatePreview()">
+      </div>
+      <div class="push-preview">
+        <div style="font-size:11px;color:var(--t3);margin-bottom:8px">Preview</div>
+        <div class="push-notif">
+          <div class="push-notif-title" id="prev-title">Weekend Promo!</div>
+          <div class="push-notif-body" id="prev-body">Get 20% off all services this Saturday only</div>
+        </div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="sendPush()" style="width:auto">
+        <i class="ti ti-send" aria-hidden="true"></i> Send to All Members
+      </button>
+      <div id="push-result" style="font-size:12px;color:var(--t3);margin-top:8px"></div>
+    </div>
+
+    <!-- RECENT ACTIVITY -->
+    <div class="card">
+      <div class="card-title">Recent Activity</div>
+      <div id="d-activity"><div class="loader"><i class="ti ti-loader-2" aria-hidden="true"></i></div></div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="card">
+      <div class="card-title"><i class="ti ti-settings" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>Quick Settings</div>
+      <div class="card-sub">Update your program settings</div>
+      <div class="two-col">
+        <div class="field">
+          <label class="label">Staff PIN</label>
+          <input class="input" id="set-pin" type="tel" placeholder="Current PIN" maxlength="4" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label class="label">Brand Color</label>
+          <input class="input" id="set-color" type="color" style="height:46px;padding:4px 8px;cursor:pointer">
+        </div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="saveSettings()" style="width:auto">
+        <i class="ti ti-check" aria-hidden="true"></i> Save Settings
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';
+const SUPA_URL = 'https://hrwoejdyjxpohdvfzcga.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhyd29lamR5anhwb2hkdmZ6Y2dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0Mjg0ODIsImV4cCI6MjA5NTAwNDQ4Mn0.YqfXjNFenVEp7Cu1zzMHagOqJOXtpLqMRX3z2Y3DwP4';
+const { createClient } = supabase;
+const db = createClient(SUPA_URL, SUPA_KEY);
+
+const S = { user: null, merchant: null, services: [] };
+
+// ── AUTH INIT ─────────────────────────────────────────────────
+async function init() {
+  const { data: { session } } = await db.auth.getSession();
+  if (session) { S.user = session.user; await loadMerchant(); }
+  else show('auth');
+  db.auth.onAuthStateChange((_,sess)=>{ if(sess) { S.user=sess.user; loadMerchant(); } });
+}
+
+// ── SIGN IN / UP / OUT ────────────────────────────────────────
+async function signIn() {
+  const email=$('auth-email').value.trim(), pass=$('auth-pass').value;
+  if(!email||!pass){toast('Fill in all fields');return;}
+  const btn=$('signin-btn');btn.disabled=true;btn.textContent='Signing in…';
+  const{error}=await db.auth.signInWithPassword({email,password:pass});
+  if(error){toast(error.message);btn.disabled=false;btn.innerHTML='<i class="ti ti-arrow-right"></i> Sign In';}
+}
+
+async function signUp() {
+  const email=$('su-email').value.trim(), pass=$('su-pass').value;
+  if(!email||!pass){toast('Fill in all fields');return;}
+  const btn=$('signup-btn');btn.disabled=true;btn.textContent='Creating…';
+  const{error}=await db.auth.signUp({email,password:pass});
+  if(error){toast(error.message);}else{toast('Account created! Check your email.');show('setup');}
+  btn.disabled=false;btn.innerHTML='<i class="ti ti-user-plus"></i> Create Account';
+}
+
+async function signOut(){await db.auth.signOut();location.reload();}
+function toggleSignup(){const a=$('auth-form'),b=$('signup-form');a.style.display=a.style.display==='none'?'flex':'none';b.style.display=b.style.display==='none'?'flex':'none';}
+
+// ── LOAD MERCHANT ─────────────────────────────────────────────
+async function loadMerchant() {
+  if (!S.user) return;
+  const res = await fetch(`${API}/api/merchant/by-auth/${S.user.id}`);
+  const data = await res.json();
+  if (!data) { S.merchant=null; show('setup'); return; }
+  S.merchant = data;
+  showDashboard();
+}
+
+// ── SETUP WIZARD ──────────────────────────────────────────────
+function slugify(el) {
+  el.value = el.value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+  $('slug-preview').textContent = el.value || 'your-slug';
+}
+function setColor(hex, el) {
+  $('w-color').value = hex;
+  document.querySelectorAll('.color-opt').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+}
+function addSvc() {
+  const val=$('svc-input').value.trim();
+  if(!val||S.services.includes(val))return;
+  S.services.push(val);$('svc-input').value='';renderSvcTags();
+}
+function removeSvc(s){S.services=S.services.filter(x=>x!==s);renderSvcTags();}
+function renderSvcTags(){
+  $('svc-tags').innerHTML=S.services.map(s=>`<span class="tag">${esc(s)}<button onclick="removeSvc('${esc(s)}')" aria-label="Remove">×</button></span>`).join('');
+}
+
+async function doSetup() {
+  const name=$('w-name').value.trim(),slug=$('w-slug').value.trim();
+  if(!name||!slug){toast('Business name and slug are required');return;}
+  if(!S.services.length){toast('Add at least one service');return;}
+  const btn=$('setup-btn');btn.disabled=true;btn.textContent='Creating…';
+  const res=await fetch(`${API}/api/merchant`,{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      name,slug,email:S.user.email,authId:S.user.id,
+      brandColor:$('w-color').value,logoText:$('w-logo').value.trim()||name.substring(0,6).toUpperCase(),
+      stampsPerCard:parseInt($('w-stamps').value),
+      rewardName:$('w-reward').value.trim()||'Free Item',
+      rewardValue:$('w-reward-val').value.trim(),
+      services:S.services,
+    })
+  });
+  const data=await res.json();
+  if(!res.ok){toast(data.error||'Error');btn.disabled=false;btn.innerHTML='<i class="ti ti-rocket"></i> Launch My Loyalty Program';return;}
+  // Update staff PIN
+  const staffRes=await fetch(`${API}/api/staff/${data.id}`).then(r=>r.json());
+  if(staffRes[0]&&$('w-pin').value.trim()){
+    await fetch(`${API}/api/staff/${staffRes[0].id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin:$('w-pin').value.trim()})});
+  }
+  S.merchant=data;
+  showDashboard();
+  toast('Your loyalty program is live! 🎉');
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────
+async function showDashboard() {
+  const m=S.merchant, base=location.origin;
+  $('nav-biz').textContent = m.name;
+  $('link-card').textContent = `${base}/card?m=${m.slug}`;
+  $('link-staff').textContent = `${base}/staff?m=${m.slug}`;
+  $('set-color').value = m.brand_color || '#C9A84C';
+  show('dashboard');
+  loadStats();
+}
+
+async function loadStats(){
+  const data=await fetch(`${API}/api/dashboard/${S.merchant.id}`).then(r=>r.json());
+  $('d-members').textContent=data.members;
+  $('d-today').textContent=data.todayStamps;
+  $('d-week').textContent=data.weekStamps;
+  $('d-redeem').textContent=data.weekRedemptions;
+  const box=$('d-activity');
+  if(!data.recent?.length){box.innerHTML='<div style="text-align:center;padding:24px;color:var(--t3);font-size:13px">No activity yet</div>';return;}
+  box.innerHTML=data.recent.map(s=>`
+    <div class="act-row">
+      <div class="act-ico"><i class="ti ti-star" aria-hidden="true"></i></div>
+      <div class="act-info"><div class="act-name">${esc(s.members?.name||'Member')}</div><div class="act-detail">${esc(s.service)} · ${esc(s.branch)}</div></div>
+      <div class="act-time">${fmtTime(s.created_at)}</div>
+    </div>`).join('');
+}
+
+// ── PUSH ──────────────────────────────────────────────────────
+function updatePreview(){
+  $('prev-title').textContent=$('push-title').value||'Title';
+  $('prev-body').textContent=$('push-body').value||'Message body';
+}
+async function sendPush(){
+  const title=$('push-title').value.trim(),body=$('push-body').value.trim();
+  if(!title||!body){toast('Enter title and message');return;}
+  const res=await fetch(`${API}/api/push/broadcast`,{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({merchantId:S.merchant.id,title,body})
+  });
+  const data=await res.json();
+  $('push-result').textContent=`Sent to ${data.sent} member${data.sent!==1?'s':''}`;
+  toast('Notification sent!');
+}
+
+// ── SETTINGS ──────────────────────────────────────────────────
+async function saveSettings(){
+  const pin=$('set-pin').value.trim(),color=$('set-color').value;
+  await fetch(`${API}/api/merchant/${S.merchant.id}`,{
+    method:'PATCH',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({brand_color:color})
+  });
+  if(pin){
+    const staffRes=await fetch(`${API}/api/staff/${S.merchant.id}`).then(r=>r.json());
+    if(staffRes[0]) await fetch(`${API}/api/staff/${staffRes[0].id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin})});
+  }
+  toast('Settings saved!');
+}
+
+// ── COPY ─────────────────────────────────────────────────────
+function copyLink(id){
+  navigator.clipboard.writeText($(id).textContent).then(()=>toast('Link copied!'));
+}
+
+// ── UTILS ─────────────────────────────────────────────────────
+function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));$('v-'+id).classList.add('on');}
+function $(id){return document.getElementById(id);}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function fmtTime(s){const d=new Date(s),t=new Date();return d.toDateString()===t.toDateString()?d.toLocaleTimeString('en-MY',{hour:'2-digit',minute:'2-digit'}):d.toLocaleDateString('en-MY',{day:'numeric',month:'short'});}
+let _tt;function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('on');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('on'),2500);}
+
+init();
+</script>
+</body>
+</html>
