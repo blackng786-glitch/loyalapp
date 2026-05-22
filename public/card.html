@@ -27,6 +27,639 @@
 html,body{height:100%;background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-size:15px;overflow-x:hidden}
 input,select,button{font-family:'DM Sans',sans-serif}
 button{cursor:pointer}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Rewards">
+<meta id="meta-theme" name="theme-color" content="#0A0A0A">
+<link id="pwa-manifest" rel="manifest">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<title>Loyalty Card</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --brand:#C9A84C;--brand-r:201;--brand-g:168;--brand-b:76;
+  --bg:#0A0A0A;--s1:#141414;--s2:#1C1C1C;--s3:#242424;
+  --b1:#1E1E1E;--b2:#2A2A2A;--b3:#3A3A3A;
+  --t1:#F0EDE6;--t2:#9A9590;--t3:#585450;
+  --r:12px;--rs:8px;
+}
+html,body{height:100%;background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-size:15px;overflow-x:hidden}
+input,select,button{font-family:'DM Sans',sans-serif}
+button{cursor:pointer}
+
+.app{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
+.view{display:none;flex-direction:column;flex:1;max-width:430px;margin:0 auto;width:100%}
+.view.on{display:flex}
+
+/* NAV */
+.nav{padding:13px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--b1);background:rgba(10,10,10,0.94);backdrop-filter:blur(12px);flex-shrink:0;position:sticky;top:0;z-index:50}
+.nav-brand{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:3px;color:var(--brand)}
+.nav-btn{background:transparent;border:1px solid var(--b3);border-radius:20px;padding:5px 14px;color:var(--t2);font-size:12px;transition:all .2s}
+
+/* BUTTONS */
+.btn{width:100%;padding:14px;border-radius:var(--rs);border:none;font-size:15px;font-weight:500;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:7px}
+.btn:active{transform:scale(0.97)}
+.btn:disabled{opacity:0.4;cursor:not-allowed;transform:none}
+.btn-brand{background:var(--brand);color:#0A0A0A}
+.btn-outline{background:transparent;border:1px solid var(--b3);color:var(--t2)}
+.btn-outline:hover{color:var(--t1)}
+
+/* INPUTS */
+.input{width:100%;padding:14px 16px;background:var(--s1);border:1px solid var(--b2);border-radius:var(--rs);color:var(--t1);font-size:15px;outline:none;transition:border .2s;-webkit-appearance:none}
+.input:focus{border-color:var(--brand)}
+.input::placeholder{color:var(--t3)}
+.label{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;display:block}
+
+/* LANDING */
+.landing-body{flex:1;display:flex;flex-direction:column;padding:0 20px 40px;overflow-y:auto}
+.hero{padding:52px 0 36px;text-align:center}
+.hero-logo{font-family:'Bebas Neue',sans-serif;font-size:54px;letter-spacing:5px;color:var(--brand);line-height:1}
+.hero-name{font-size:13px;color:var(--t3);letter-spacing:1px;margin-top:4px}
+.hero-sub{font-size:12px;color:var(--t3);letter-spacing:2px;text-transform:uppercase;margin-top:4px}
+.form-stack{display:flex;flex-direction:column;gap:12px}
+.divider{display:flex;align-items:center;gap:10px;margin:4px 0}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--b2)}
+.divider span{font-size:11px;color:var(--t3)}
+
+/* INSTALL BANNER */
+.install-banner{margin:0 0 12px;background:rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.08);border:1px solid rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.2);border-radius:var(--rs);padding:12px 14px;display:flex;align-items:center;gap:10px}
+.install-banner i{color:var(--brand);font-size:20px;flex-shrink:0}
+.install-text{flex:1;font-size:12px;color:var(--t2);line-height:1.5}
+.install-btn{background:var(--brand);border:none;border-radius:6px;color:#0A0A0A;font-size:12px;font-weight:500;padding:6px 12px;white-space:nowrap;cursor:pointer;transition:all .2s}
+
+/* MEMBER CARD */
+.m-card{margin:14px 16px;border-radius:16px;padding:20px;position:relative;overflow:hidden;flex-shrink:0;border:1px solid rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.4);background:linear-gradient(135deg,rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.06) 0%,rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.03) 100%)}
+.m-card::after{content:'';position:absolute;top:-30px;right:-30px;width:110px;height:110px;border-radius:50%;border:1px solid rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.08);pointer-events:none}
+.mc-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.mc-brand{font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:3px;color:var(--brand)}
+.mc-tier{font-size:10px;color:var(--brand);background:rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.12);border:1px solid rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.25);border-radius:20px;padding:3px 10px;letter-spacing:1px}
+.mc-name{font-size:18px;font-weight:500;margin-bottom:2px}
+.mc-phone{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);letter-spacing:1px;margin-bottom:14px}
+.mc-stats{display:flex;gap:24px}
+.mc-val{font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--brand);line-height:1}
+.mc-lbl{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:1px}
+
+/* TABS */
+.tabs{display:flex;border-bottom:1px solid var(--b1);flex-shrink:0;padding:0 2px}
+.tab{flex:1;padding:10px 4px;border:none;background:transparent;color:var(--t3);font-size:12px;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s}
+.tab.on{color:var(--brand);border-bottom-color:var(--brand)}
+.pane{display:none;flex:1;flex-direction:column;gap:12px;padding:14px 16px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.pane.on{display:flex}
+
+/* BOX */
+.box{background:var(--s1);border:1px solid var(--b2);border-radius:var(--r);padding:15px}
+.box-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.box-ttl{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3)}
+
+/* STAMPS */
+.s-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.stamp{aspect-ratio:1;border-radius:50%;border:1.5px solid var(--b3);display:flex;align-items:center;justify-content:center;transition:all .3s}
+.stamp.on{background:var(--brand);border-color:var(--brand)}
+.stamp.on i{color:#0A0A0A;font-size:13px}
+.stamp.off i{color:var(--b3);font-size:13px}
+.s-note{grid-column:span 5;text-align:center;font-size:11px;color:var(--t3);margin-top:6px}
+.prog{background:var(--s3);border-radius:20px;height:5px;margin:8px 0}
+.prog-fill{background:var(--brand);border-radius:20px;height:5px;transition:width .6s ease}
+
+/* REWARDS */
+.reward{background:var(--s1);border:1px solid var(--b2);border-radius:var(--r);padding:13px;display:flex;align-items:center;gap:11px}
+.reward.on{border-color:rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.5)}
+.rw-ico{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.rw-ico.lock{background:var(--s3)}
+.rw-ico.open{background:rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.1);border:1px solid rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.2)}
+.rw-ico i{font-size:18px}
+.rw-ico.lock i{color:var(--t3)}
+.rw-ico.open i{color:var(--brand)}
+.rw-body{flex:1;min-width:0}
+.rw-name{font-size:13px;font-weight:500}
+.rw-desc{font-size:11px;color:var(--t2);margin-top:2px}
+.rw-req{font-size:11px;color:var(--brand);margin-top:3px}
+.btn-rw{padding:6px 13px;border-radius:6px;border:1px solid rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.4);background:transparent;color:var(--brand);font-size:12px;transition:all .2s;flex-shrink:0}
+.btn-rw:hover:not(:disabled){background:var(--brand);color:#0A0A0A}
+.btn-rw:disabled{border-color:var(--b2);color:var(--t3);cursor:not-allowed}
+
+/* HISTORY */
+.h-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--b1)}
+.h-item:last-child{border-bottom:none}
+.h-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.h-dot.s{background:var(--brand)}
+.h-dot.r{background:#4A9E6A}
+.h-info{flex:1;min-width:0}
+.h-ttl{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.h-meta{font-size:11px;color:var(--t3);font-family:'DM Mono',monospace;margin-top:2px}
+.h-val{font-family:'DM Mono',monospace;font-size:12px;white-space:nowrap}
+.h-val.p{color:var(--brand)}
+.h-val.m{color:#4A9E6A}
+
+/* QR */
+.qr-wrap{background:var(--s1);border:1px solid var(--b2);border-radius:var(--r);padding:22px;text-align:center}
+.qr-frame{width:150px;height:150px;margin:0 auto 14px;background:#fff;border-radius:var(--rs);padding:8px;display:flex;align-items:center;justify-content:center}
+.qr-id{font-family:'DM Mono',monospace;font-size:12px;color:var(--brand);letter-spacing:2px;margin-bottom:4px}
+
+/* PUSH PROMPT */
+.push-card{background:var(--s1);border:1px solid var(--b2);border-radius:var(--r);padding:14px;display:flex;align-items:center;gap:12px}
+.push-card i{font-size:22px;color:var(--brand);flex-shrink:0}
+.push-body{flex:1}
+.push-title{font-size:13px;font-weight:500;margin-bottom:2px}
+.push-sub{font-size:11px;color:var(--t2)}
+
+/* MODAL */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.65);display:flex;align-items:flex-end;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity .2s}
+.overlay.on{opacity:1;pointer-events:all}
+.modal{background:var(--s1);border:1px solid var(--b2);border-top-left-radius:16px;border-top-right-radius:16px;padding:22px;width:100%;max-width:430px}
+.modal-title{font-size:16px;font-weight:500;margin-bottom:4px}
+.modal-sub{font-size:12px;color:var(--t2);margin-bottom:16px}
+.modal-btns{display:flex;gap:8px;margin-top:4px}
+.modal-btns .btn{flex:1}
+
+/* TOAST */
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(50px);background:var(--s2);border:1px solid rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.4);border-radius:10px;padding:10px 18px;font-size:13px;color:var(--brand);transition:transform .25s;z-index:200;pointer-events:none;white-space:nowrap}
+.toast.on{transform:translateX(-50%) translateY(0)}
+
+/* EMPTY */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;text-align:center;color:var(--t3)}
+.empty i{font-size:44px;margin-bottom:12px;display:block;color:var(--b3)}
+.empty p{font-size:13px;line-height:1.6}
+
+/* LOADER */
+.loader{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--t3)}
+.loader i{animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.fade{animation:fi .25s ease}
+@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ── LOADING ───────────────────────────────────── -->
+<div id="v-loading" class="view on" style="align-items:center;justify-content:center">
+  <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:4px;color:var(--brand)">LOYALAPP</div>
+  <div style="font-size:12px;color:var(--t3);margin-top:8px">Loading...</div>
+</div>
+
+<!-- ── ERROR ─────────────────────────────────────── -->
+<div id="v-error" class="view" style="align-items:center;justify-content:center;padding:32px;text-align:center">
+  <i class="ti ti-alert-circle" style="font-size:48px;color:var(--t3);margin-bottom:16px;display:block"></i>
+  <div style="font-size:16px;font-weight:500;margin-bottom:8px">Merchant not found</div>
+  <div style="font-size:13px;color:var(--t2)">Check the link and try again.</div>
+</div>
+
+<!-- ── LANDING ───────────────────────────────────── -->
+<div id="v-landing" class="view">
+  <div class="landing-body">
+    <div class="hero">
+      <div class="hero-logo" id="hero-logo">LOYAL</div>
+      <div class="hero-name" id="hero-name"></div>
+      <div class="hero-sub">Member Rewards</div>
+    </div>
+    <div id="install-banner" class="install-banner" style="display:none">
+      <i class="ti ti-download" aria-hidden="true"></i>
+      <div class="install-text">Add to your home screen for quick access — no App Store needed</div>
+      <button class="install-btn" onclick="installPWA()">Install</button>
+    </div>
+    <div id="ios-banner" class="install-banner" style="display:none">
+      <i class="ti ti-share" aria-hidden="true"></i>
+      <div class="install-text">Tap <strong>Share</strong> → <strong>Add to Home Screen</strong> to install</div>
+    </div>
+    <div class="form-stack">
+      <div>
+        <label class="label" for="ph-in">Your Phone Number</label>
+        <input class="input" id="ph-in" type="tel" placeholder="011-2345 6789" inputmode="numeric" maxlength="15" autocomplete="tel">
+      </div>
+      <button class="btn btn-brand" id="find-btn" onclick="findMember()">
+        <i class="ti ti-arrow-right" aria-hidden="true"></i> Find My Card
+      </button>
+      <div class="divider"><span>New member?</span></div>
+      <button class="btn btn-outline" onclick="goReg()">Join for Free</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── REGISTER ──────────────────────────────────── -->
+<div id="v-register" class="view">
+  <nav class="nav">
+    <button class="nav-btn" onclick="show('landing')"><i class="ti ti-arrow-left" aria-hidden="true"></i> Back</button>
+    <div class="nav-brand" id="reg-brand">LOYAL</div>
+    <div style="width:54px"></div>
+  </nav>
+  <div style="padding:28px 20px;flex:1;overflow-y:auto">
+    <div style="font-size:22px;font-weight:500;margin-bottom:4px">Join the Club</div>
+    <div style="font-size:13px;color:var(--t2);margin-bottom:24px">Every visit earns you rewards</div>
+    <div class="form-stack">
+      <div>
+        <label class="label" for="r-name">Full Name</label>
+        <input class="input" id="r-name" type="text" placeholder="Ahmad bin Abdullah" autocomplete="name">
+      </div>
+      <div>
+        <label class="label" for="r-phone">Phone Number</label>
+        <input class="input" id="r-phone" type="tel" placeholder="011-2345 6789" inputmode="numeric" autocomplete="tel">
+      </div>
+      <button class="btn btn-brand" id="reg-btn" onclick="doRegister()" style="margin-top:4px">
+        <i class="ti ti-check" aria-hidden="true"></i> Create My Card
+      </button>
+      <p style="font-size:11px;color:var(--t3);text-align:center">By joining you agree to receive updates from this business</p>
+    </div>
+  </div>
+</div>
+
+<!-- ── MEMBER CARD ───────────────────────────────── -->
+<div id="v-member" class="view">
+  <nav class="nav">
+    <div class="nav-brand" id="mem-brand">LOYAL</div>
+    <button class="nav-btn" onclick="show('landing')"><i class="ti ti-logout" aria-hidden="true"></i></button>
+  </nav>
+
+  <div class="m-card fade" id="mc">
+    <div class="mc-top">
+      <div class="mc-brand" id="mc-brand">LOYALAPP</div>
+      <div class="mc-tier" id="mc-tier">Bronze</div>
+    </div>
+    <div class="mc-name" id="mc-name">—</div>
+    <div class="mc-phone" id="mc-phone">—</div>
+    <div class="mc-stats">
+      <div><div class="mc-val" id="mc-stamps">0</div><div class="mc-lbl">Stamps</div></div>
+      <div><div class="mc-val" id="mc-pts">0</div><div class="mc-lbl">Points</div></div>
+      <div><div class="mc-val" id="mc-free">0</div><div class="mc-lbl">Free</div></div>
+    </div>
+  </div>
+
+  <div class="tabs" id="mem-tabs">
+    <button class="tab on" onclick="mTab(0,'stamps')">Stamps</button>
+    <button class="tab" onclick="mTab(1,'rewards')">Rewards</button>
+    <button class="tab" onclick="mTab(2,'history')">History</button>
+    <button class="tab" onclick="mTab(3,'qr')">My QR</button>
+  </div>
+
+  <div class="pane on" id="tp-stamps">
+    <div class="box">
+      <div class="box-hdr">
+        <div class="box-ttl">Current Card</div>
+        <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--brand)" id="s-label">0 / 10</div>
+      </div>
+      <div class="s-grid" id="s-grid"></div>
+      <div class="s-note" id="s-note">10 stamps = Free Item</div>
+    </div>
+    <div class="box">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:13px">Next reward in <span style="color:var(--brand)" id="s-left">10</span> stamps</div>
+        <div style="font-size:11px;color:var(--t3)" id="card-num">Card 1</div>
+      </div>
+      <div class="prog"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <div class="pane" id="tp-rewards">
+    <div id="rewards-wrap"></div>
+  </div>
+
+  <div class="pane" id="tp-history">
+    <div id="history-wrap"><div class="loader"><i class="ti ti-loader-2" aria-hidden="true"></i></div></div>
+  </div>
+
+  <div class="pane" id="tp-qr">
+    <div class="qr-wrap">
+      <div class="qr-frame"><div id="qr-canvas"></div>
+      <div class="qr-id" id="qr-label">—</div>
+      <div style="font-size:11px;color:var(--t3)">Show this to staff after every visit</div>
+    </div>
+    <div id="push-section"></div>
+    <div class="box">
+      <div class="box-ttl" style="margin-bottom:8px">How it works</div>
+      <div style="font-size:13px;color:var(--t2);line-height:1.7">Show your QR code or give your phone number to staff after each visit to earn stamps. Collect enough stamps to redeem rewards!</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── REDEEM CONFIRM MODAL ───────────────────────── -->
+<div class="overlay" id="redeem-modal">
+  <div class="modal">
+    <div class="modal-title">Confirm Redemption</div>
+    <div class="modal-sub" id="redeem-modal-sub">Redeem this reward?</div>
+    <div style="background:var(--s2);border-radius:var(--rs);padding:12px;margin-bottom:16px;font-size:13px;color:var(--t2)">
+      Show this screen to staff to complete your redemption.
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-outline" onclick="closeOverlay('redeem-modal')">Cancel</button>
+      <button class="btn btn-brand" onclick="confirmRedeem()"><i class="ti ti-check" aria-hidden="true"></i> Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────
+const API = ''; // Empty = same origin (Railway serves everything)
+const SUPA_URL = 'https://hrwoejdyjxpohdvfzcga.supabase.co';
+const SUPA_KEY = 'YeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhyd29lamR5anhwb2hkdmZ6Y2dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0Mjg0ODIsImV4cCI6MjA5NTAwNDQ4Mn0.YqfXjNFenVEp7Cu1zzMHagOqJOXtpLqMRX3z2Y3DwP4';
+
+// ── STATE ─────────────────────────────────────────────────────
+const S = { merchant: null, member: null, stamps: [], redemptions: [], pendingRedeem: null };
+let deferredInstall = null;
+
+// ── SUPABASE ──────────────────────────────────────────────────
+const { createClient } = supabase;
+const db = createClient(SUPA_URL, SUPA_KEY);
+
+// ── INIT ──────────────────────────────────────────────────────
+async function init() {
+  const slug = new URLSearchParams(location.search).get('m');
+  if (!slug) { show('error'); return; }
+
+  // Load merchant
+  const res = await fetch(`${API}/api/merchant/${slug}`);
+  if (!res.ok) { show('error'); return; }
+  S.merchant = await res.json();
+
+  applyBranding(S.merchant);
+  setupManifest(slug);
+  setupPWAPrompts();
+  registerSW();
+  show('landing');
+}
+
+function applyBranding(m) {
+  const hex = m.brand_color || '#C9A84C';
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  const root = document.documentElement.style;
+  root.setProperty('--brand', hex);
+  root.setProperty('--brand-r', r);
+  root.setProperty('--brand-g', g);
+  root.setProperty('--brand-b', b);
+  document.getElementById('meta-theme').content = hex;
+  const logo = m.logo_text || m.name.substring(0,6).toUpperCase();
+  document.title = m.name + ' · Rewards';
+  $('hero-logo').textContent = logo;
+  $('hero-name').textContent = m.name;
+  $('reg-brand').textContent = logo;
+  $('mem-brand').textContent = logo;
+  $('mc-brand').textContent = m.name.toUpperCase();
+  $('s-note').textContent = m.stamps_per_card + ' stamps = ' + m.reward_name + (m.reward_value ? ' (' + m.reward_value + ')' : '');
+}
+
+function setupManifest(slug) {
+  const link = document.getElementById('pwa-manifest');
+  link.href = `/manifest/${slug}.json`;
+}
+
+// ── PWA INSTALL PROMPTS ───────────────────────────────────────
+function setupPWAPrompts() {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  if (isStandalone) return;
+  if (isIOS) { $('ios-banner').style.display = 'flex'; return; }
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault(); deferredInstall = e;
+    $('install-banner').style.display = 'flex';
+  });
+}
+
+async function installPWA() {
+  if (!deferredInstall) return;
+  deferredInstall.prompt();
+  await deferredInstall.userChoice;
+  deferredInstall = null;
+  $('install-banner').style.display = 'none';
+}
+
+// ── SERVICE WORKER ────────────────────────────────────────────
+function registerSW() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('/sw.js').catch(console.error);
+}
+
+// ── ROUTING ──────────────────────────────────────────────────
+function show(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
+  document.getElementById('v-' + id).classList.add('on');
+}
+
+// ── MEMBER LOOKUP ─────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('ph-in')?.addEventListener('keydown', e => { if(e.key==='Enter') findMember(); });
+  init();
+});
+
+async function findMember() {
+  const phone = $('ph-in').value.trim();
+  if (!phone) { toast('Please enter your phone number'); return; }
+  const btn = $('find-btn'); btn.disabled = true; btn.textContent = 'Searching…';
+  try {
+    const res = await fetch(`${API}/api/member?phone=${encodeURIComponent(phone)}&merchantId=${S.merchant.id}`);
+    const data = await res.json();
+    if (!data) { toast('Not found — please register'); goReg(); return; }
+    S.member = data;
+    S.stamps = [];
+    S.redemptions = [];
+    try {
+      const ar = await fetch(`${API}/api/member/${data.id}/activity`);
+      const ad = await ar.json();
+      S.stamps = ad.stamps || [];
+      S.redemptions = ad.redemptions || [];
+    } catch(e2) {}
+    renderMemberView();
+    show('member');
+  } catch(e) { toast('Connection error: ' + e.message); }
+  finally { btn.disabled=false; btn.innerHTML='<i class="ti ti-arrow-right"></i> Find My Card'; }
+}
+
+function goReg() {
+  const ph = $('ph-in').value.trim();
+  if (ph) $('r-phone').value = ph;
+  show('register');
+}
+
+async function doRegister() {
+  const name = $('r-name').value.trim(), phone = $('r-phone').value.trim();
+  if (!name || !phone) { toast('Name and phone are required'); return; }
+  const btn = $('reg-btn'); btn.disabled=true; btn.textContent='Creating…';
+  try {
+    const res = await fetch(`${API}/api/member`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ name, phone, merchantId: S.merchant.id })
+    });
+    const data = await res.json();
+    if (!res.ok) { toast(data.error || 'Error'); return; }
+    S.member = data;
+    S.stamps = []; S.redemptions = [];
+    renderMemberView();
+    show('member');
+    toast('Welcome, ' + name.split(' ')[0] + '!');
+  } catch(e) { toast('Connection error'); }
+  finally { btn.disabled=false; btn.innerHTML='<i class="ti ti-check"></i> Create My Card'; }
+}
+
+// ── LOAD ACTIVITY ─────────────────────────────────────────────
+async function loadActivity() {
+  try {
+    const res = await fetch(`${API}/api/member/${S.member.id}/activity`);
+    const data = await res.json();
+    S.stamps = data.stamps || [];
+    S.redemptions = data.redemptions || [];
+  } catch(e) {
+    S.stamps = [];
+    S.redemptions = [];
+  }
+}
+
+// ── RENDER MEMBER VIEW ────────────────────────────────────────
+function renderMemberView() {
+  const m = S.merchant, total = S.stamps.length, pts = total * 10;
+  const comp = Math.floor(total / m.stamps_per_card);
+  const used = S.redemptions.length;
+  const free = Math.max(0, comp - used);
+  const current = total % m.stamps_per_card;
+  const cardNo = comp + 1;
+  let tier = 'Bronze';
+  if (total>=200) tier='Platinum'; else if(total>=100) tier='Gold'; else if(total>=50) tier='Silver';
+
+  $('mc-name').textContent = S.member.name;
+  $('mc-phone').textContent = S.member.phone;
+  $('mc-tier').textContent = tier;
+  $('mc-stamps').textContent = total;
+  $('mc-pts').textContent = pts;
+  $('mc-free').textContent = free;
+
+  // Stamp grid
+  const grid = $('s-grid'); grid.innerHTML='';
+  for (let i=0;i<m.stamps_per_card;i++) {
+    const d = mk('div'); d.className='stamp '+(i<current?'on':'off');
+    d.innerHTML=`<i class="ti ${i<current?'ti-check':'ti-droplet'}" aria-hidden="true"></i>`;
+    grid.appendChild(d);
+  }
+  $('s-label').textContent = current+' / '+m.stamps_per_card;
+  $('s-left').textContent = m.stamps_per_card - current;
+  $('card-num').textContent = 'Card '+cardNo;
+  $('prog-fill').style.width = Math.round(current/m.stamps_per_card*100)+'%';
+
+  renderRewards(m, total, pts, free);
+  renderHistory();
+  renderQR();
+  renderPushSection();
+}
+
+function renderRewards(m, total, pts, free) {
+  const rewards = [
+    { name: m.reward_name, desc: (m.reward_value||'') + ' · Complete a stamp card', icon:'ti-gift', ok: free>0, label: free>0 ? free+' available' : 'Complete a card first' },
+    { name: 'Loyalty Voucher', desc: '100 pts · Special reward', icon:'ti-ticket', ok: pts>=100, label: pts+' / 100 pts' },
+    { name: 'VIP Reward', desc: '300 pts · Exclusive member benefit', icon:'ti-crown', ok: pts>=300, label: pts+' / 300 pts' },
+  ];
+  const wrap = $('rewards-wrap'); wrap.innerHTML='';
+  rewards.forEach(r => {
+    const d=mk('div'); d.className='reward'+(r.ok?' on':'');
+    d.innerHTML=`
+      <div class="rw-ico ${r.ok?'open':'lock'}"><i class="ti ${r.icon}" aria-hidden="true"></i></div>
+      <div class="rw-body"><div class="rw-name">${esc(r.name)}</div><div class="rw-desc">${esc(r.desc)}</div><div class="rw-req">${r.label}</div></div>
+      <button class="btn-rw" ${r.ok?'':'disabled'} onclick="openRedeem('${esc(r.name)}')">${r.ok?'Redeem':'Locked'}</button>`;
+    wrap.appendChild(d);
+  });
+}
+
+function renderHistory() {
+  const all=[
+    ...S.stamps.map(s=>({type:'s',title:s.service,meta:s.branch,date:s.created_at,val:'+10 pts'})),
+    ...S.redemptions.map(r=>({type:'r',title:r.reward_name,meta:'Redeemed',date:r.created_at,val:'Used'})),
+  ].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const wrap=$('history-wrap');
+  if (!all.length) { wrap.innerHTML='<div class="empty"><i class="ti ti-history" aria-hidden="true"></i><p>No activity yet. Visit us to earn your first stamp!</p></div>'; return; }
+  wrap.innerHTML=all.map(e=>`<div class="h-item"><div class="h-dot ${e.type}"></div><div class="h-info"><div class="h-ttl">${esc(e.title)}</div><div class="h-meta">${esc(e.meta)} · ${fmtDate(e.date)}</div></div><div class="h-val ${e.type==='s'?'p':'m'}">${e.val}</div></div>`).join('');
+}
+
+function renderQR() {
+  $('qr-label').textContent = S.member.phone;
+  const canvas = $('qr-canvas');
+  canvas.innerHTML = '';
+  new QRCode(canvas, {
+    text: S.member.phone,
+    width: 130,
+    height: 130,
+    colorDark: '#0A0A0A',
+    colorLight: '#ffffff',
+  });
+}
+
+function renderPushSection() {
+  const sec = $('push-section');
+  if (!('Notification' in window) || Notification.permission === 'granted') { sec.innerHTML=''; return; }
+  sec.innerHTML=`<div class="push-card"><i class="ti ti-bell" aria-hidden="true"></i><div class="push-body"><div class="push-title">Enable notifications</div><div class="push-sub">Get notified when stamps are added and rewards are available</div></div><button class="btn-rw" onclick="setupPush()" style="white-space:nowrap">Enable</button></div>`;
+}
+
+async function setupPush() {
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { toast('Notifications blocked'); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const keyRes = await fetch(`${API}/api/vapid-key`);
+    const { key } = await keyRes.json();
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey: urlB64(key) });
+    await fetch(`${API}/api/push/subscribe`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ memberId: S.member.id, subscription: sub })
+    });
+    renderPushSection();
+    toast('Notifications enabled!');
+  } catch(e) { toast('Could not enable notifications'); }
+}
+
+// ── TABS ──────────────────────────────────────────────────────
+function mTab(idx, id) {
+  document.querySelectorAll('#mem-tabs .tab').forEach((t,i)=>t.classList.toggle('on',i===idx));
+  ['stamps','rewards','history','qr'].forEach(n=>{ const el=$('tp-'+n); if(el) el.classList.toggle('on',n===id); });
+}
+
+// ── REDEEM ────────────────────────────────────────────────────
+function openRedeem(name) {
+  S.pendingRedeem = name;
+  $('redeem-modal-sub').textContent = 'Redeem: ' + name;
+  $('redeem-modal').classList.add('on');
+}
+
+async function confirmRedeem() {
+  closeOverlay('redeem-modal');
+  const res = await fetch(`${API}/api/redeem`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ memberId: S.member.id, merchantId: S.merchant.id, rewardName: S.pendingRedeem })
+  });
+  if (res.ok) {
+    await loadActivity();
+    renderMemberView();
+    toast('Redeemed! Show to staff.');
+  } else toast('Error — please try again');
+}
+
+function closeOverlay(id) { $(id).classList.remove('on'); }
+
+// ── UTILS ─────────────────────────────────────────────────────
+function $(id) { return document.getElementById(id); }
+function mk(t) { return document.createElement(t); }
+function esc(s) { return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtDate(s) { return new Date(s).toLocaleDateString('en-MY',{day:'numeric',month:'short',year:'numeric'}); }
+
+let _tt;
+function toast(msg) {
+  const el=$('toast'); el.textContent=msg; el.classList.add('on');
+  clearTimeout(_tt); _tt=setTimeout(()=>el.classList.remove('on'),2500);
+}
+
+function urlB64(b64) {
+  const pad = '='.repeat((4-b64.length%4)%4);
+  const raw = atob((b64+pad).replace(/-/g,'+').replace(/_/g,'/'));
+  return new Uint8Array([...raw].map(c=>c.charCodeAt(0)));
+}
+</script>
+</body>
+</html>
 
 .app{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
 .view{display:none;flex-direction:column;flex:1;max-width:430px;margin:0 auto;width:100%}
