@@ -431,10 +431,17 @@ async function findMember() {
     const data = await res.json();
     if (!data) { toast('Not found — please register'); goReg(); return; }
     S.member = data;
-    await loadActivity();
+    S.stamps = [];
+    S.redemptions = [];
+    try {
+      const ar = await fetch(`${API}/api/member/${data.id}/activity`);
+      const ad = await ar.json();
+      S.stamps = ad.stamps || [];
+      S.redemptions = ad.redemptions || [];
+    } catch(e2) {}
     renderMemberView();
     show('member');
-  } catch(e) { toast('Connection error'); }
+  } catch(e) { toast('Connection error: ' + e.message); }
   finally { btn.disabled=false; btn.innerHTML='<i class="ti ti-arrow-right"></i> Find My Card'; }
 }
 
