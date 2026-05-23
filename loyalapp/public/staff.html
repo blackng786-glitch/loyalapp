@@ -3,43 +3,34 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Staff Panel</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-:root{
-  --brand:#C9A84C;--brand-r:201;--brand-g:168;--brand-b:76;
-  --bg:#0A0A0A;--s1:#141414;--s2:#1C1C1C;--s3:#242424;
-  --b1:#1E1E1E;--b2:#2A2A2A;--b3:#3A3A3A;
-  --t1:#F0EDE6;--t2:#9A9590;--t3:#585450;--r:12px;--rs:8px;
-}
+:root{--brand:#C9A84C;--brand-r:201;--brand-g:168;--brand-b:76;--bg:#0A0A0A;--s1:#141414;--s2:#1C1C1C;--s3:#242424;--b1:#1E1E1E;--b2:#2A2A2A;--b3:#3A3A3A;--t1:#F0EDE6;--t2:#9A9590;--t3:#585450;--r:12px;--rs:8px;}
 html,body{height:100%;background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-size:15px;overflow-x:hidden}
 input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
-
 .app{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
 .view{display:none;flex-direction:column;flex:1;max-width:430px;margin:0 auto;width:100%}
 .view.on{display:flex}
-
 .nav{padding:13px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--b1);background:rgba(10,10,10,0.94);backdrop-filter:blur(12px);flex-shrink:0;position:sticky;top:0;z-index:50}
 .nav-brand{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:3px;color:var(--brand)}
 .nav-btn{background:transparent;border:1px solid var(--b3);border-radius:20px;padding:5px 14px;color:var(--t2);font-size:12px;transition:all .2s}
 .badge{background:rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.1);border:1px solid rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.25);border-radius:20px;padding:4px 12px;font-size:11px;color:var(--brand);letter-spacing:1px}
-
 .btn{width:100%;padding:14px;border-radius:var(--rs);border:none;font-size:15px;font-weight:500;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:7px}
 .btn:active{transform:scale(0.97)}
 .btn:disabled{opacity:0.4;cursor:not-allowed;transform:none}
 .btn-brand{background:var(--brand);color:#0A0A0A}
 .btn-outline{background:transparent;border:1px solid var(--b3);color:var(--t2)}
-
 .tabs{display:flex;border-bottom:1px solid var(--b1);flex-shrink:0}
 .tab{flex:1;padding:10px 4px;border:none;background:transparent;color:var(--t3);font-size:13px;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s}
 .tab.on{color:var(--brand);border-bottom-color:var(--brand)}
 .pane{display:none;flex:1;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .pane.on{display:flex}
-
-/* PIN */
 .pin-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px}
 .pin-logo{font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:2px;color:var(--brand);margin-bottom:4px}
 .pin-sub{font-size:13px;color:var(--t3);margin-bottom:32px}
@@ -51,17 +42,16 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
 .pk:hover{background:var(--s2)}
 .pk:active{transform:scale(0.92)}
 .pk.del{font-size:16px;color:var(--t3)}
-
-/* SEARCH */
-.search-wrap{padding:12px 16px;flex-shrink:0}
-.search-box{position:relative}
+.search-wrap{padding:10px 16px 6px;flex-shrink:0}
+.search-row{display:flex;gap:8px;align-items:center}
+.search-box{position:relative;flex:1}
 .search-box i.ico{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--t3);font-size:16px;pointer-events:none}
-.search-input{width:100%;padding:12px 14px 12px 42px;background:var(--s1);border:1px solid var(--b2);border-radius:var(--rs);color:var(--t1);font-size:14px;outline:none;transition:border .2s;-webkit-appearance:none}
+.search-input{width:100%;padding:11px 14px 11px 42px;background:var(--s1);border:1px solid var(--b2);border-radius:var(--rs);color:var(--t1);font-size:14px;outline:none;transition:border .2s;-webkit-appearance:none}
 .search-input:focus{border-color:var(--brand)}
 .search-input::placeholder{color:var(--t3)}
-
-/* MEMBER RESULT */
-.results{padding:0 16px 40px;flex:1}
+.scan-btn{padding:11px 14px;border-radius:var(--rs);border:1px solid rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.4);background:rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.08);color:var(--brand);font-size:13px;display:flex;align-items:center;gap:6px;white-space:nowrap;flex-shrink:0;transition:all .2s}
+.scan-btn:hover{background:rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.15)}
+.results{padding:8px 16px 40px;flex:1}
 .mr{background:var(--s1);border:1px solid var(--b2);border-radius:var(--r);padding:13px;margin-bottom:10px}
 .mr-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .avatar{width:42px;height:42px;border-radius:50%;background:rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.1);border:1px solid rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.3);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:15px;color:var(--brand);letter-spacing:1px;flex-shrink:0}
@@ -79,14 +69,11 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
 .sm.off i{color:var(--b3)}
 .act-row{display:flex;gap:8px}
 .act-row .btn{font-size:13px;font-weight:400;padding:10px}
-
-/* STATS */
 .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 16px}
 .stat{background:var(--s1);border:1px solid var(--b2);border-radius:var(--r);padding:14px}
 .stat-lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:6px}
 .stat-val{font-family:'Bebas Neue',sans-serif;font-size:30px;color:var(--brand);line-height:1}
 .stat-sub{font-size:11px;color:var(--t3);margin-top:4px}
-
 .act-box{background:var(--s1);border:1px solid var(--b2);border-radius:var(--r);overflow:hidden;margin:0 16px 16px}
 .act-item{display:flex;align-items:center;gap:10px;padding:10px 13px;border-bottom:1px solid var(--b1)}
 .act-item:last-child{border-bottom:none}
@@ -95,7 +82,28 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
 .act-name{font-size:13px}
 .act-sub{font-size:11px;color:var(--t3)}
 .act-time{font-size:11px;color:var(--t3);font-family:'DM Mono',monospace;margin-left:auto}
-
+/* SCANNER */
+.scanner-wrap{position:fixed;inset:0;background:#000;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.scanner-header{position:absolute;top:0;left:0;right:0;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;background:rgba(0,0,0,0.7)}
+.scanner-title{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:var(--brand)}
+.scanner-close{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:20px;padding:6px 16px;color:#fff;font-size:12px}
+.scanner-video-wrap{width:300px;height:300px;position:relative;border-radius:16px;overflow:hidden}
+.scanner-video-wrap video{width:100%;height:100%;object-fit:cover}
+.scan-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.scan-box{width:200px;height:200px;border:2px solid var(--brand);border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,0.5);position:relative}
+.sc{position:absolute;width:20px;height:20px;border-color:var(--brand);border-style:solid}
+.sc.tl{top:-2px;left:-2px;border-width:3px 0 0 3px;border-radius:4px 0 0 0}
+.sc.tr{top:-2px;right:-2px;border-width:3px 3px 0 0;border-radius:0 4px 0 0}
+.sc.bl{bottom:-2px;left:-2px;border-width:0 0 3px 3px;border-radius:0 0 0 4px}
+.sc.br{bottom:-2px;right:-2px;border-width:0 3px 3px 0;border-radius:0 0 4px 0}
+.scanner-hint{margin-top:20px;font-size:13px;color:rgba(255,255,255,0.7);text-align:center}
+.scanner-status{margin-top:8px;font-size:12px;color:var(--brand);text-align:center;min-height:20px}
+canvas#scan-canvas{display:none}
+/* INSTALL */
+.install-bar{background:rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.06);border-bottom:1px solid rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.2);padding:10px 18px;display:flex;align-items:center;gap:10px}
+.install-bar i{color:var(--brand);font-size:18px;flex-shrink:0}
+.install-bar-text{flex:1;font-size:12px;color:var(--t2)}
+.install-bar-btn{background:var(--brand);border:none;border-radius:6px;color:#0A0A0A;font-size:11px;font-weight:500;padding:5px 12px;cursor:pointer;white-space:nowrap}
 /* MODAL */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.65);display:flex;align-items:flex-end;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity .2s}
 .overlay.on{opacity:1;pointer-events:all}
@@ -105,11 +113,9 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
 .modal-select{width:100%;padding:12px;background:var(--s2);border:1px solid var(--b2);border-radius:var(--rs);color:var(--t1);font-size:14px;outline:none;margin-bottom:14px;cursor:pointer;-webkit-appearance:none}
 .modal-btns{display:flex;gap:8px}
 .modal-btns .btn{flex:1}
-
-.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(50px);background:var(--s2);border:1px solid rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.4);border-radius:10px;padding:10px 18px;font-size:13px;color:var(--brand);transition:transform .25s;z-index:200;pointer-events:none;white-space:nowrap}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(50px);background:var(--s2);border:1px solid rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.4);border-radius:10px;padding:10px 18px;font-size:13px;color:var(--brand);transition:transform .25s;z-index:300;pointer-events:none;white-space:nowrap}
 .toast.on{transform:translateX(-50%) translateY(0)}
-
-.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;text-align:center;color:var(--t3)}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;text-align:center;color:var(--t3)}
 .empty i{font-size:44px;margin-bottom:12px;display:block;color:var(--b3)}
 .empty p{font-size:13px;line-height:1.6}
 .loader{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--t3)}
@@ -118,12 +124,12 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
 .fade{animation:fi .2s ease}
 @keyframes fi{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 .section-lbl{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);padding:0 16px;flex-shrink:0;margin-top:4px}
+.member-count{font-size:11px;color:var(--t3);padding:4px 16px 0;flex-shrink:0}
 </style>
 </head>
 <body>
 <div class="app">
 
-<!-- PIN VIEW -->
 <div id="v-pin" class="view on">
   <div class="pin-center fade">
     <div class="pin-logo" id="pin-logo">STAFF</div>
@@ -141,41 +147,50 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
   </div>
 </div>
 
-<!-- STAFF MAIN VIEW -->
 <div id="v-staff" class="view">
   <nav class="nav">
     <div class="nav-brand" id="s-brand">STAFF</div>
     <div style="display:flex;align-items:center;gap:8px">
       <div class="badge" id="branch-badge">Branch</div>
+      <button class="nav-btn" id="staff-install-btn" style="display:none" onclick="doInstall()"><i class="ti ti-device-mobile-down" aria-hidden="true"></i></button>
       <button class="nav-btn" onclick="logout()"><i class="ti ti-logout" aria-hidden="true"></i></button>
     </div>
   </nav>
+
+  <div id="install-ios-bar" class="install-bar" style="display:none">
+    <i class="ti ti-share" aria-hidden="true"></i>
+    <div class="install-bar-text">Tap <strong>Share</strong> then <strong>Add to Home Screen</strong> to install</div>
+  </div>
 
   <div class="tabs" id="staff-tabs">
     <button class="tab on" onclick="sTab(0,'search')">Members</button>
     <button class="tab" onclick="sTab(1,'dashboard')">Dashboard</button>
   </div>
 
-  <!-- SEARCH PANE -->
   <div class="pane on" id="tp-search">
     <div class="search-wrap">
-      <div class="search-box">
-        <i class="ti ti-search ico" aria-hidden="true"></i>
-        <input class="search-input" id="s-search" type="text" placeholder="Search name or phone number…" oninput="doSearch(this.value)" autocomplete="off">
+      <div class="search-row">
+        <div class="search-box">
+          <i class="ti ti-search ico" aria-hidden="true"></i>
+          <input class="search-input" id="s-search" type="text" placeholder="Search name or phone..." oninput="onSearch(this.value)" autocomplete="off">
+        </div>
+        <button class="scan-btn" onclick="openScanner()">
+          <i class="ti ti-scan" aria-hidden="true"></i> Scan QR
+        </button>
       </div>
     </div>
+    <div class="member-count" id="member-count"></div>
     <div class="results" id="s-results">
-      <div class="empty"><i class="ti ti-users" aria-hidden="true"></i><p>Search for a member to add stamps or view their history</p></div>
+      <div class="loader"><i class="ti ti-loader-2" aria-hidden="true"></i></div>
     </div>
   </div>
 
-  <!-- DASHBOARD PANE -->
   <div class="pane" id="tp-dashboard" style="gap:0">
     <div class="stats-grid">
-      <div class="stat"><div class="stat-lbl">Members</div><div class="stat-val" id="d-members">—</div></div>
-      <div class="stat"><div class="stat-lbl">Today</div><div class="stat-val" id="d-today">—</div><div class="stat-sub">stamps</div></div>
-      <div class="stat"><div class="stat-lbl">This Week</div><div class="stat-val" id="d-week">—</div><div class="stat-sub">stamps</div></div>
-      <div class="stat"><div class="stat-lbl">Redemptions</div><div class="stat-val" id="d-redeem">—</div><div class="stat-sub">this week</div></div>
+      <div class="stat"><div class="stat-lbl">Members</div><div class="stat-val" id="d-members">-</div></div>
+      <div class="stat"><div class="stat-lbl">Today</div><div class="stat-val" id="d-today">-</div><div class="stat-sub">stamps</div></div>
+      <div class="stat"><div class="stat-lbl">This Week</div><div class="stat-val" id="d-week">-</div><div class="stat-sub">stamps</div></div>
+      <div class="stat"><div class="stat-lbl">Redemptions</div><div class="stat-val" id="d-redeem">-</div><div class="stat-sub">this week</div></div>
     </div>
     <div class="section-lbl" style="margin-bottom:10px">Recent Activity</div>
     <div class="act-box" id="d-activity">
@@ -184,7 +199,26 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
   </div>
 </div>
 
-<!-- STAMP MODAL -->
+<!-- QR SCANNER -->
+<div class="scanner-wrap" id="scanner-wrap" style="display:none">
+  <div class="scanner-header">
+    <div class="scanner-title">SCAN MEMBER QR</div>
+    <button class="scanner-close" onclick="closeScanner()"><i class="ti ti-x" aria-hidden="true"></i> Close</button>
+  </div>
+  <div class="scanner-video-wrap">
+    <video id="scan-video" playsinline autoplay muted></video>
+    <div class="scan-overlay">
+      <div class="scan-box">
+        <div class="sc tl"></div><div class="sc tr"></div>
+        <div class="sc bl"></div><div class="sc br"></div>
+      </div>
+    </div>
+  </div>
+  <div class="scanner-hint">Point camera at member's QR code</div>
+  <div class="scanner-status" id="scan-status">Initializing camera...</div>
+  <canvas id="scan-canvas"></canvas>
+</div>
+
 <div class="overlay" id="stamp-modal">
   <div class="modal">
     <div class="modal-title">Add Stamp</div>
@@ -196,156 +230,209 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
     </div>
   </div>
 </div>
-
 <div class="toast" id="toast"></div>
 
 <script>
-const API = '';
-const S = { merchant: null, staff: null, pin: '' };
-let pendingMemberId = '', pendingMemberName = '';
+const API='';
+const S={merchant:null,staff:null,pin:'',allMembers:[],filteredMembers:[]};
+let pendingMemberId='',pendingMemberName='';
+let scanStream=null,scanTimer=null,scanActive=false;
+let deferredInstall=null;
 
-async function init() {
-  const slug = new URLSearchParams(location.search).get('m');
-  if (!slug) { document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;color:#9A9590;font-size:13px">No merchant specified. Add ?m=your-slug to the URL.</div>'; return; }
-  const res = await fetch(`${API}/api/merchant/${slug}`);
-  if (!res.ok) { document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;color:#9A9590;font-size:13px">Merchant not found.</div>'; return; }
-  S.merchant = await res.json();
+async function init(){
+  const slug=new URLSearchParams(location.search).get('m');
+  if(!slug){document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;color:#9A9590;font-size:13px">Add ?m=your-slug to the URL.</div>';return;}
+  const res=await fetch(API+'/api/merchant/'+slug);
+  if(!res.ok){document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;color:#9A9590;font-size:13px">Merchant not found.</div>';return;}
+  S.merchant=await res.json();
   applyBranding(S.merchant);
-  $('pin-logo').textContent = S.merchant.logo_text || S.merchant.name;
-  $('pin-sub').textContent = 'Staff PIN for ' + S.merchant.name;
+  $('pin-logo').textContent=S.merchant.logo_text||S.merchant.name;
+  $('pin-sub').textContent='Staff PIN for '+S.merchant.name;
+  setupInstall();
 }
 
-function applyBranding(m) {
-  const hex = m.brand_color || '#C9A84C';
-  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
-  const root = document.documentElement.style;
-  root.setProperty('--brand', hex);
-  root.setProperty('--brand-r', r);
-  root.setProperty('--brand-g', g);
-  root.setProperty('--brand-b', b);
-  document.title = m.name + ' · Staff';
+function applyBranding(m){
+  const hex=m.brand_color||'#C9A84C';
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  const root=document.documentElement.style;
+  root.setProperty('--brand',hex);root.setProperty('--brand-r',r);root.setProperty('--brand-g',g);root.setProperty('--brand-b',b);
+  document.title=m.name+' - Staff';
 }
 
-// ── PIN ───────────────────────────────────────────────────────
-function pk(d) {
-  if (S.pin.length >= 4) return;
-  S.pin += d; updDots();
-  if (S.pin.length === 4) setTimeout(checkPin, 100);
-}
-function pd() { S.pin = S.pin.slice(0,-1); updDots(); }
-function updDots() { document.querySelectorAll('.pd').forEach((el,i)=>el.classList.toggle('on',i<S.pin.length)); }
-
-async function checkPin() {
-  const res = await fetch(`${API}/api/staff/login`, {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ merchantId: S.merchant.id, pin: S.pin })
+function setupInstall(){
+  const standalone=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone;
+  if(standalone)return;
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
+  if(isIOS)document.getElementById('install-ios-bar').style.display='flex';
+  window.addEventListener('beforeinstallprompt',e=>{
+    e.preventDefault();deferredInstall=e;
+    document.getElementById('staff-install-btn').style.display='flex';
   });
-  if (!res.ok) { toast('Incorrect PIN'); S.pin=''; updDots(); return; }
-  S.staff = await res.json();
-  S.pin = ''; updDots();
-
-  // Setup staff view
-  $('s-brand').textContent = S.merchant.logo_text || S.merchant.name;
-  $('branch-badge').textContent = S.staff.branch;
-  // Populate service options
-  const sel = $('modal-svc'); sel.innerHTML='';
-  (S.merchant.services||['Service']).forEach(svc => {
-    const o = document.createElement('option'); o.textContent = svc; sel.appendChild(o);
-  });
-  show('staff'); loadDashboard();
-  toast('Welcome, ' + S.staff.name + '!');
 }
 
-function logout() { S.staff=null; show('pin'); }
-
-// ── ROUTING ───────────────────────────────────────────────────
-function show(id) {
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
-  $('v-'+id).classList.add('on');
+async function doInstall(){
+  if(!deferredInstall)return;
+  deferredInstall.prompt();
+  await deferredInstall.userChoice;
+  deferredInstall=null;
+  document.getElementById('staff-install-btn').style.display='none';
 }
-function sTab(idx, id) {
+
+function pk(d){if(S.pin.length>=4)return;S.pin+=d;updDots();if(S.pin.length===4)setTimeout(checkPin,100);}
+function pd(){S.pin=S.pin.slice(0,-1);updDots();}
+function updDots(){document.querySelectorAll('.pd').forEach((el,i)=>el.classList.toggle('on',i<S.pin.length));}
+
+async function checkPin(){
+  const res=await fetch(API+'/api/staff/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({merchantId:S.merchant.id,pin:S.pin})});
+  if(!res.ok){toast('Incorrect PIN');S.pin='';updDots();return;}
+  S.staff=await res.json();S.pin='';updDots();
+  $('s-brand').textContent=S.merchant.logo_text||S.merchant.name;
+  $('branch-badge').textContent=S.staff.branch;
+  const sel=$('modal-svc');sel.innerHTML='';
+  (S.merchant.services||['Service']).forEach(svc=>{const o=document.createElement('option');o.textContent=svc;sel.appendChild(o);});
+  show('staff');
+  loadAllMembers();
+  loadDashboard();
+  toast('Welcome, '+S.staff.name+'!');
+}
+
+function logout(){S.staff=null;show('pin');}
+function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));$('v-'+id).classList.add('on');}
+
+function sTab(idx,id){
   document.querySelectorAll('#staff-tabs .tab').forEach((t,i)=>t.classList.toggle('on',i===idx));
-  ['search','dashboard'].forEach(n=>{ const el=$('tp-'+n); if(el) el.classList.toggle('on',n===id); });
-  if (id==='dashboard') loadDashboard();
+  ['search','dashboard'].forEach(n=>{const el=$('tp-'+n);if(el)el.classList.toggle('on',n===id);});
+  if(id==='dashboard')loadDashboard();
 }
 
-// ── SEARCH ────────────────────────────────────────────────────
-let _st;
-function doSearch(q) { clearTimeout(_st); _st = setTimeout(()=>runSearch(q), 280); }
+// LOAD ALL MEMBERS
+async function loadAllMembers(){
+  $('s-results').innerHTML='<div class="loader"><i class="ti ti-loader-2" aria-hidden="true"></i></div>';
+  const data=await fetch(API+'/api/members/all?merchantId='+S.merchant.id).then(r=>r.json());
+  S.allMembers=data||[];
+  S.filteredMembers=S.allMembers;
+  renderMemberList(S.allMembers);
+}
 
-async function runSearch(q) {
-  const res = $('s-results');
-  if (!q.trim()) { res.innerHTML='<div class="empty"><i class="ti ti-users" aria-hidden="true"></i><p>Search for a member to add stamps or view their history</p></div>'; return; }
-  res.innerHTML='<div class="loader"><i class="ti ti-loader-2" aria-hidden="true"></i></div>';
-  const data = await fetch(`${API}/api/members/search?q=${encodeURIComponent(q)}&merchantId=${S.merchant.id}`).then(r=>r.json());
-  if (!data?.length) { res.innerHTML='<div class="empty"><i class="ti ti-search" aria-hidden="true"></i><p>No member found</p></div>'; return; }
-  const perCard = S.merchant.stamps_per_card || 10;
+function onSearch(q){
+  if(!q.trim()){S.filteredMembers=S.allMembers;renderMemberList(S.allMembers);return;}
+  const lq=q.toLowerCase();
+  S.filteredMembers=S.allMembers.filter(m=>m.name.toLowerCase().includes(lq)||m.phone.includes(q));
+  renderMemberList(S.filteredMembers);
+}
+
+function renderMemberList(members){
+  const res=$('s-results');
+  const count=$('member-count');
+  if(!members.length){
+    count.textContent='';
+    res.innerHTML='<div class="empty"><i class="ti ti-users" aria-hidden="true"></i><p>No members found</p></div>';
+    return;
+  }
+  count.textContent=members.length+' member'+(members.length!==1?'s':'');
+  const perCard=S.merchant.stamps_per_card||10;
   res.innerHTML='';
-  data.forEach(m => {
-    const cur = m.stampCount % perCard, pts = m.stampCount * 10;
-    const init = m.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
-    const minis = Array.from({length:perCard},(_,i)=>`<div class="sm ${i<cur?'on':'off'}"><i class="ti ${i<cur?'ti-check':'ti-droplet'}" aria-hidden="true"></i></div>`).join('');
-    const card = mk('div'); card.className='mr fade';
-    card.innerHTML=`
-      <div class="mr-top">
-        <div class="avatar">${esc(init)}</div>
-        <div class="mr-info"><div class="mr-name">${esc(m.name)}</div><div class="mr-meta">${esc(m.phone)} · ${m.stampCount} stamps</div></div>
-        <div class="mr-pts"><div class="mr-pts-val">${pts}</div><div class="mr-pts-lbl">pts</div></div>
-      </div>
-      <div class="sm-row">${minis}</div>
-      <div class="act-row">
-        <button class="btn btn-brand" onclick="openStamp('${m.id}','${esc(m.name)}')"><i class="ti ti-star" aria-hidden="true"></i> Add Stamp</button>
-        <button class="btn btn-outline" onclick="toast('Redemption — coming soon')"><i class="ti ti-gift" aria-hidden="true"></i> Redeem</button>
-      </div>`;
+  members.forEach(m=>{
+    const cur=m.stampCount%perCard,pts=m.stampCount*10;
+    const init=m.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+    const minis=Array.from({length:perCard},(_,i)=>'<div class="sm '+(i<cur?'on':'off')+'"><i class="ti '+(i<cur?'ti-check':'ti-droplet')+'" aria-hidden="true"></i></div>').join('');
+    const card=mk('div');card.className='mr fade';
+    card.innerHTML='<div class="mr-top"><div class="avatar">'+esc(init)+'</div><div class="mr-info"><div class="mr-name">'+esc(m.name)+'</div><div class="mr-meta">'+esc(m.phone)+' - '+m.stampCount+' stamps</div></div><div class="mr-pts"><div class="mr-pts-val">'+pts+'</div><div class="mr-pts-lbl">pts</div></div></div><div class="sm-row">'+minis+'</div><div class="act-row"><button class="btn btn-brand" onclick="openStamp(\''+m.id+'\',\''+esc(m.name)+'\')"><i class="ti ti-star" aria-hidden="true"></i> Add Stamp</button><button class="btn btn-outline" onclick="toast(\'Redemption coming soon\')"><i class="ti ti-gift" aria-hidden="true"></i> Redeem</button></div>';
     res.appendChild(card);
   });
 }
 
-// ── STAMP ────────────────────────────────────────────────────
-function openStamp(id, name) {
-  pendingMemberId=id; pendingMemberName=name;
+// QR SCANNER
+async function openScanner(){
+  $('scanner-wrap').style.display='flex';
+  $('scan-status').textContent='Starting camera...';
+  scanActive=true;
+  try{
+    scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}}});
+    const video=$('scan-video');
+    video.srcObject=scanStream;
+    video.onloadedmetadata=()=>{video.play();startScanLoop();};
+    $('scan-status').textContent='Ready - point at QR code';
+  }catch(e){
+    $('scan-status').textContent='Camera access denied';
+    toast('Camera permission required');
+  }
+}
+
+function closeScanner(){
+  scanActive=false;clearTimeout(scanTimer);
+  if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;}
+  $('scan-video').srcObject=null;
+  $('scanner-wrap').style.display='none';
+}
+
+function startScanLoop(){
+  if(!scanActive)return;
+  const video=$('scan-video'),canvas=$('scan-canvas'),ctx=canvas.getContext('2d');
+  function tick(){
+    if(!scanActive)return;
+    if(video.readyState===video.HAVE_ENOUGH_DATA){
+      canvas.width=video.videoWidth;canvas.height=video.videoHeight;
+      ctx.drawImage(video,0,0,canvas.width,canvas.height);
+      const img=ctx.getImageData(0,0,canvas.width,canvas.height);
+      const code=jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'});
+      if(code&&code.data){
+        $('scan-status').textContent='Found: '+code.data;
+        closeScanner();
+        handleQR(code.data);
+        return;
+      }
+    }
+    scanTimer=setTimeout(tick,150);
+  }
+  tick();
+}
+
+async function handleQR(data){
+  const phone=data.trim();
+  $('s-search').value=phone;
+  toast('QR scanned - searching...');
+  onSearch(phone);
+  if(!S.filteredMembers.length){
+    const res=$('s-results');
+    res.innerHTML='<div class="loader"><i class="ti ti-loader-2" aria-hidden="true"></i></div>';
+    const found=await fetch(API+'/api/members/search?q='+encodeURIComponent(phone)+'&merchantId='+S.merchant.id).then(r=>r.json());
+    renderMemberList(found||[]);
+  }
+}
+
+function openStamp(id,name){
+  pendingMemberId=id;pendingMemberName=name;
   $('modal-name').textContent=name;
   $('stamp-modal').classList.add('on');
 }
-function closeModal() { $('stamp-modal').classList.remove('on'); }
+function closeModal(){$('stamp-modal').classList.remove('on');}
 
-async function doStamp() {
-  const svc = $('modal-svc').value; closeModal();
-  const res = await fetch(`${API}/api/stamp`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ memberId:pendingMemberId, merchantId:S.merchant.id, service:svc, staffPin:S.staff.pin })
-  });
-  if (res.ok) {
-    toast('✓ Stamp added for ' + pendingMemberName);
-    doSearch($('s-search').value);
-  } else toast('Error adding stamp');
+async function doStamp(){
+  const svc=$('modal-svc').value;closeModal();
+  const res=await fetch(API+'/api/stamp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({memberId:pendingMemberId,merchantId:S.merchant.id,service:svc,staffPin:S.staff.pin})});
+  if(res.ok){toast('Stamp added for '+pendingMemberName);loadAllMembers();}
+  else toast('Error adding stamp');
 }
 
-$('stamp-modal').addEventListener('click', function(e){ if(e.target===this) closeModal(); });
+$('stamp-modal').addEventListener('click',function(e){if(e.target===this)closeModal();});
 
-// ── DASHBOARD ─────────────────────────────────────────────────
-async function loadDashboard() {
-  const data = await fetch(`${API}/api/dashboard/${S.merchant.id}`).then(r=>r.json());
-  $('d-members').textContent = data.members;
-  $('d-today').textContent   = data.todayStamps;
-  $('d-week').textContent    = data.weekStamps;
-  $('d-redeem').textContent  = data.weekRedemptions;
-  const box = $('d-activity');
-  if (!data.recent?.length) { box.innerHTML='<div class="empty" style="padding:24px"><i class="ti ti-history" aria-hidden="true"></i><p>No activity yet</p></div>'; return; }
-  box.innerHTML = data.recent.map(s=>`
-    <div class="act-item">
-      <div class="act-ico"><i class="ti ti-star" aria-hidden="true"></i></div>
-      <div style="flex:1;min-width:0"><div class="act-name">${esc(s.members?.name||'Member')}</div><div class="act-sub">${esc(s.service)} · ${esc(s.branch)}</div></div>
-      <div class="act-time">${fmtTime(s.created_at)}</div>
-    </div>`).join('');
+async function loadDashboard(){
+  const data=await fetch(API+'/api/dashboard/'+S.merchant.id).then(r=>r.json());
+  $('d-members').textContent=data.members;
+  $('d-today').textContent=data.todayStamps;
+  $('d-week').textContent=data.weekStamps;
+  $('d-redeem').textContent=data.weekRedemptions;
+  const box=$('d-activity');
+  if(!data.recent||!data.recent.length){box.innerHTML='<div class="empty" style="padding:24px"><i class="ti ti-history" aria-hidden="true"></i><p>No activity yet</p></div>';return;}
+  box.innerHTML=data.recent.map(s=>'<div class="act-item"><div class="act-ico"><i class="ti ti-star" aria-hidden="true"></i></div><div style="flex:1;min-width:0"><div class="act-name">'+esc(s.members&&s.members.name?s.members.name:'Member')+'</div><div class="act-sub">'+esc(s.service)+' - '+esc(s.branch)+'</div></div><div class="act-time">'+fmtTime(s.created_at)+'</div></div>').join('');
 }
 
-// ── UTILS ─────────────────────────────────────────────────────
-function $(id){ return document.getElementById(id); }
-function mk(t){ return document.createElement(t); }
-function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function fmtTime(s){ const d=new Date(s),t=new Date(); return d.toDateString()===t.toDateString()?d.toLocaleTimeString('en-MY',{hour:'2-digit',minute:'2-digit'}):d.toLocaleDateString('en-MY',{day:'numeric',month:'short'}); }
-let _tt; function toast(msg){ const el=$('toast');el.textContent=msg;el.classList.add('on');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('on'),2500); }
+function $(id){return document.getElementById(id);}
+function mk(t){return document.createElement(t);}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function fmtTime(s){const d=new Date(s),t=new Date();return d.toDateString()===t.toDateString()?d.toLocaleTimeString('en-MY',{hour:'2-digit',minute:'2-digit'}):d.toLocaleDateString('en-MY',{day:'numeric',month:'short'});}
+let _tt;function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('on');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('on'),2500);}
 
 init();
 </script>
