@@ -80,8 +80,9 @@ app.post('/api/merchant', async (req, res) => {
     services: services || ['Service'],
   }).select().single();
   if (error) return res.status(400).json({ error: error.message });
-  // Create default staff account
-  await db.from('staff').insert({ merchant_id: data.id, name: 'Staff', pin: '1234', branch: name });
+  // Create default staff account + default branch
+  await db.from('staff').insert({ merchant_id: data.id, name: 'Staff', pin: '1234', branch: 'Main Branch' });
+  await db.from('branches').insert({ merchant_id: data.id, name: 'Main Branch' });
   res.json(data);
 });
 
@@ -182,14 +183,14 @@ app.get('/api/members/all', async (req, res) => {
 
 // ── ADD STAMP ────────────────────────────────────────────────
 app.post('/api/stamp', async (req, res) => {
-  const { memberId, merchantId, service, staffPin } = req.body;
+  const { memberId, merchantId, service, staffPin, branch } = req.body;
   const { data: staffRows } = await db.from('staff')
     .select('*').eq('merchant_id', merchantId).eq('pin', staffPin).limit(1);
   if (!staffRows?.length) return res.status(401).json({ error: 'Invalid PIN' });
 
   const { data, error } = await db.from('stamps').insert({
     member_id: memberId, merchant_id: merchantId,
-    service, branch: staffRows[0].branch, staff_name: staffRows[0].name,
+    service, branch: branch || staffRows[0].branch, staff_name: staffRows[0].name,
   }).select().single();
   if (error) return res.status(400).json({ error: error.message });
 
@@ -261,9 +262,77 @@ app.post('/api/push/subscribe', async (req, res) => {
 // ── BROADCAST PUSH NOTIFICATION ───────────────────────────────
 app.post('/api/push/broadcast', async (req, res) => {
   const { merchantId, title, body } = req.body;
+  const sent = await broadcastToMembers(merchantId, title, body);
+  res.json({ sent });
+});
+
+// ── SCHEDULE A PUSH (定时发送) ─────────────────────────────────
+app.post('/api/push/schedule', async (req, res) => {
+  const { merchantId, title, body, scheduledAt } = req.body;
+  if (!merchantId || !title || !body || !scheduledAt)
+    return res.status(400).json({ error: 'merchantId, title, body, scheduledAt required' });
+  const { data, error } = await db.from('scheduled_pushes')
+    .insert({ merchant_id: merchantId, title, body, scheduled_at: scheduledAt })
+    .select().single();
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+// ── LIST SCHEDULED PUSHES ─────────────────────────────────────
+app.get('/api/push/scheduled/:merchantId', async (req, res) => {
+  const { data } = await db.from('scheduled_pushes')
+    .select('*').eq('merchant_id', req.params.merchantId)
+    .order('scheduled_at', { ascending: false }).limit(50);
+  res.json(data || []);
+});
+
+// ── CANCEL A SCHEDULED PUSH ───────────────────────────────────
+app.delete('/api/push/scheduled/:id', async (req, res) => {
+  const { error } = await db.from('scheduled_pushes')
+    .update({ status: 'cancelled' }).eq('id', req.params.id).eq('status', 'pending');
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ ok: true });
+});
+
+// ── AUTO WIN-BACK (一键挽留 N 天未到店的会员) ──────────────────
+app.post('/api/push/winback', async (req, res) => {
+  const { merchantId, days = 14, title, body } = req.body;
+  if (!merchantId) return res.status(400).json({ error: 'merchantId required' });
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+
   const { data: members } = await db.from('members').select('id').eq('merchant_id', merchantId);
-  const ids = (members || []).map(m => m.id);
-  if (!ids.length) return res.json({ sent: 0 });
+  const allIds = (members || []).map(m => m.id);
+  if (!allIds.length) return res.json({ sent: 0, targeted: 0 });
+
+  // 找出 cutoff 之后仍有到店(印章)的会员 → 这些是“活跃”的,排除掉
+  const { data: recentStamps } = await db.from('stamps')
+    .select('member_id').eq('merchant_id', merchantId).gte('created_at', cutoff);
+  const active = new Set((recentStamps || []).map(s => s.member_id));
+  const lapsedIds = allIds.filter(id => !active.has(id));
+  if (!lapsedIds.length) return res.json({ sent: 0, targeted: 0 });
+
+  const t = title || 'We miss you! 💛';
+  const b = body || `It's been a while — come back and earn rewards!`;
+  const sent = await broadcastToMembers(merchantId, t, b, lapsedIds);
+  res.json({ sent, targeted: lapsedIds.length });
+});
+
+// ── PUSH HELPERS ──────────────────────────────────────────────
+async function notifyMember(memberId, title, body) {
+  const { data } = await db.from('push_subscriptions')
+    .select('subscription').eq('member_id', memberId).maybeSingle();
+  if (!data) return;
+  await webpush.sendNotification(data.subscription, JSON.stringify({ title, body }));
+}
+
+// 向某商户的会员广播 (可选 memberIds 限定子集); 返回成功发送数
+async function broadcastToMembers(merchantId, title, body, memberIds) {
+  let ids = memberIds;
+  if (!ids) {
+    const { data: members } = await db.from('members').select('id').eq('merchant_id', merchantId);
+    ids = (members || []).map(m => m.id);
+  }
+  if (!ids.length) return 0;
 
   const { data: subs } = await db.from('push_subscriptions').select('*').in('member_id', ids);
   let sent = 0;
@@ -272,21 +341,127 @@ app.post('/api/push/broadcast', async (req, res) => {
       await webpush.sendNotification(sub.subscription, JSON.stringify({ title, body }));
       sent++;
     } catch (e) {
-      if (e.statusCode === 410) {
-        await db.from('push_subscriptions').delete().eq('id', sub.id);
-      }
+      if (e.statusCode === 410) await db.from('push_subscriptions').delete().eq('id', sub.id);
     }
   }
-  res.json({ sent });
+  return sent;
+}
+
+// ── SCHEDULER: 每 60s 检查到期的定时推送并发送 ─────────────────
+async function processScheduledPushes() {
+  try {
+    const nowIso = new Date().toISOString();
+    const { data: due } = await db.from('scheduled_pushes')
+      .select('*').eq('status', 'pending').lte('scheduled_at', nowIso).limit(20);
+    for (const job of (due || [])) {
+      try {
+        const sent = await broadcastToMembers(job.merchant_id, job.title, job.body);
+        await db.from('scheduled_pushes')
+          .update({ status: 'sent', sent_count: sent, sent_at: new Date().toISOString() })
+          .eq('id', job.id);
+        console.log(`[scheduler] sent push "${job.title}" to ${sent} members`);
+      } catch (e) {
+        await db.from('scheduled_pushes').update({ status: 'failed' }).eq('id', job.id);
+        console.error('[scheduler] job failed', job.id, e.message);
+      }
+    }
+  } catch (e) {
+    console.error('[scheduler] tick error', e.message);
+  }
+}
+setInterval(processScheduledPushes, 60 * 1000);
+
+// ── BRANCHES (多门店管理) ─────────────────────────────────────
+app.get('/api/branches/:merchantId', async (req, res) => {
+  const { data } = await db.from('branches')
+    .select('*').eq('merchant_id', req.params.merchantId)
+    .order('created_at', { ascending: true });
+  res.json(data || []);
 });
 
-// ── PUSH HELPER ───────────────────────────────────────────────
-async function notifyMember(memberId, title, body) {
-  const { data } = await db.from('push_subscriptions')
-    .select('subscription').eq('member_id', memberId).maybeSingle();
-  if (!data) return;
-  await webpush.sendNotification(data.subscription, JSON.stringify({ title, body }));
-}
+app.post('/api/branches', async (req, res) => {
+  const { merchantId, name } = req.body;
+  if (!merchantId || !name?.trim()) return res.status(400).json({ error: 'merchantId and name required' });
+  const { data, error } = await db.from('branches')
+    .insert({ merchant_id: merchantId, name: name.trim() }).select().single();
+  if (error) {
+    if (error.code === '23505') return res.status(409).json({ error: 'Branch already exists' });
+    return res.status(400).json({ error: error.message });
+  }
+  res.json(data);
+});
+
+app.delete('/api/branches/:id', async (req, res) => {
+  const { error } = await db.from('branches').delete().eq('id', req.params.id);
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ ok: true });
+});
+
+// ── ADVANCED ANALYTICS ────────────────────────────────────────
+app.get('/api/analytics/:merchantId', async (req, res) => {
+  const mid = req.params.merchantId;
+  const days = Math.min(parseInt(req.query.days) || 30, 90);
+  const branch = req.query.branch && req.query.branch !== 'all' ? req.query.branch : null;
+  const since = new Date(); since.setHours(0, 0, 0, 0); since.setDate(since.getDate() - (days - 1));
+  const sinceIso = since.toISOString();
+
+  let stampQ = db.from('stamps').select('member_id,service,branch,created_at')
+    .eq('merchant_id', mid).gte('created_at', sinceIso);
+  if (branch) stampQ = stampQ.eq('branch', branch);
+
+  const [stampsR, membersR, redeemR, allStampsR] = await Promise.all([
+    stampQ,
+    db.from('members').select('id,created_at').eq('merchant_id', mid),
+    db.from('redemptions').select('created_at').eq('merchant_id', mid).gte('created_at', sinceIso),
+    db.from('stamps').select('member_id').eq('merchant_id', mid),  // 全量, 用于 tier/复购
+  ]);
+  const stamps = stampsR.data || [], members = membersR.data || [],
+        redemptions = redeemR.data || [], allStamps = allStampsR.data || [];
+
+  // 生成过去 N 天的日期骨架
+  const dayKey = d => new Date(d).toISOString().slice(0, 10);
+  const skeleton = {};
+  for (let i = 0; i < days; i++) {
+    const d = new Date(since); d.setDate(d.getDate() + i);
+    skeleton[d.toISOString().slice(0, 10)] = 0;
+  }
+  const dailyStamps = { ...skeleton }, dailyMembers = { ...skeleton };
+  stamps.forEach(s => { const k = dayKey(s.created_at); if (k in dailyStamps) dailyStamps[k]++; });
+  members.forEach(m => { const k = dayKey(m.created_at); if (k in dailyMembers) dailyMembers[k]++; });
+
+  // 按服务 / 门店分布
+  const svc = {}, br = {};
+  stamps.forEach(s => { svc[s.service] = (svc[s.service] || 0) + 1; br[s.branch] = (br[s.branch] || 0) + 1; });
+
+  // 等级分布 + 复购率 (基于全量印章)
+  const perMember = {};
+  allStamps.forEach(s => perMember[s.member_id] = (perMember[s.member_id] || 0) + 1);
+  const tierCount = { Bronze: 0, Silver: 0, Gold: 0, Platinum: 0 };
+  members.forEach(m => {
+    const c = perMember[m.id] || 0;
+    let t = 'Bronze';
+    if (c >= 200) t = 'Platinum'; else if (c >= 100) t = 'Gold'; else if (c >= 50) t = 'Silver';
+    tierCount[t]++;
+  });
+  const repeatMembers = Object.values(perMember).filter(c => c > 1).length;
+  const repeatRate = members.length ? Math.round(repeatMembers / members.length * 100) : 0;
+
+  const toSeries = obj => Object.keys(obj).sort().map(k => ({ date: k, count: obj[k] }));
+  const toPairs  = obj => Object.entries(obj).map(([k, v]) => ({ label: k, count: v })).sort((a, b) => b.count - a.count);
+
+  res.json({
+    days,
+    totalStamps: stamps.length,
+    totalMembers: members.length,
+    totalRedemptions: redemptions.length,
+    repeatRate,
+    dailyStamps: toSeries(dailyStamps),
+    dailyMembers: toSeries(dailyMembers),
+    serviceBreakdown: toPairs(svc),
+    branchBreakdown: toPairs(br),
+    tierBreakdown: tierCount,
+  });
+});
 
 // ── FALLBACK: serve card.html for PWA routes ──────────────────
 app.get('/card', (req, res) => res.sendFile('card.html', { root: 'public' }));

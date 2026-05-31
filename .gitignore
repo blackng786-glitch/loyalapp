@@ -1,0 +1,7 @@
+node_modules/
+.env
+.env.local
+*.log
+_check.js
+.DS_Store
+loyalapp/node_modules/

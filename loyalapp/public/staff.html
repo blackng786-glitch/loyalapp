@@ -189,6 +189,7 @@ canvas#scan-canvas{display:none}
 
   <div class="pane on" id="tp-search">
     <div class="search-wrap">
+      <select class="search-input" id="staff-branch" style="display:none;margin-bottom:8px;padding-left:14px;cursor:pointer" title="Current branch" aria-label="Current branch"></select>
       <div class="search-row">
         <div class="search-box">
           <i class="ti ti-search ico" aria-hidden="true"></i>
@@ -311,6 +312,7 @@ async function checkPin(){
   const sel=$('modal-svc');sel.innerHTML='';
   (S.merchant.services||['Service']).forEach(svc=>{const o=document.createElement('option');o.textContent=svc;sel.appendChild(o);});
   show('staff');
+  loadStaffBranches();
   loadAllMembers();
   loadDashboard();
   toast('Welcome, '+S.staff.name+'!');
@@ -323,6 +325,15 @@ function sTab(idx,id){
   document.querySelectorAll('#staff-tabs .tab').forEach((t,i)=>t.classList.toggle('on',i===idx));
   ['search','dashboard'].forEach(n=>{const el=$('tp-'+n);if(el)el.classList.toggle('on',n===id);});
   if(id==='dashboard')loadDashboard();
+}
+
+async function loadStaffBranches(){
+  const list=await fetch(API+'/api/branches/'+S.merchant.id).then(r=>r.json()).catch(()=>[]);
+  const sel=$('staff-branch');
+  if(!list||list.length<=1){sel.style.display='none';return;}
+  sel.innerHTML=list.map(b=>'<option value="'+esc(b.name)+'">'+esc(b.name)+'</option>').join('');
+  if(S.staff&&S.staff.branch&&list.some(b=>b.name===S.staff.branch))sel.value=S.staff.branch;
+  sel.style.display='block';
 }
 
 // LOAD ALL MEMBERS
@@ -430,7 +441,8 @@ function closeModal(){$('stamp-modal').classList.remove('on');}
 
 async function doStamp(){
   const svc=$('modal-svc').value;closeModal();
-  const res=await fetch(API+'/api/stamp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({memberId:pendingMemberId,merchantId:S.merchant.id,service:svc,staffPin:S.staff.pin})});
+  const bsel=$('staff-branch');const branch=bsel&&bsel.style.display!=='none'?bsel.value:undefined;
+  const res=await fetch(API+'/api/stamp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({memberId:pendingMemberId,merchantId:S.merchant.id,service:svc,staffPin:S.staff.pin,branch})});
   if(res.ok){toast('Stamp added for '+pendingMemberName);loadAllMembers();}
   else toast('Error adding stamp');
 }

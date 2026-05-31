@@ -71,8 +71,34 @@ create table public.push_subscriptions (
   unique(member_id)
 );
 
+-- 7. SCHEDULED PUSHES (定时 / 自动化推送队列)
+create table public.scheduled_pushes (
+  id            uuid primary key default gen_random_uuid(),
+  merchant_id   uuid not null references public.merchants(id) on delete cascade,
+  title         text not null,
+  body          text not null,
+  scheduled_at  timestamptz not null,
+  status        text not null default 'pending'
+                check (status in ('pending','sent','failed','cancelled')),
+  sent_count    integer not null default 0,
+  created_at    timestamptz not null default now(),
+  sent_at       timestamptz
+);
+
+-- 8. BRANCHES (门店)
+create table public.branches (
+  id            uuid primary key default gen_random_uuid(),
+  merchant_id   uuid not null references public.merchants(id) on delete cascade,
+  name          text not null,
+  created_at    timestamptz not null default now(),
+  unique(merchant_id, name)
+);
+
 -- INDEXES
 create index idx_members_merchant  on public.members(merchant_id);
+create index idx_sched_merchant    on public.scheduled_pushes(merchant_id);
+create index idx_sched_due         on public.scheduled_pushes(status, scheduled_at);
+create index idx_branches_merchant on public.branches(merchant_id);
 create index idx_stamps_member     on public.stamps(member_id);
 create index idx_stamps_merchant   on public.stamps(merchant_id);
 create index idx_stamps_created    on public.stamps(created_at desc);
@@ -86,6 +112,8 @@ alter table public.members           enable row level security;
 alter table public.stamps            enable row level security;
 alter table public.redemptions       enable row level security;
 alter table public.push_subscriptions enable row level security;
+alter table public.scheduled_pushes  enable row level security;
+alter table public.branches          enable row level security;
 
 create policy "open_merchants"     on public.merchants          for all using (true) with check (true);
 create policy "open_staff"         on public.staff              for all using (true) with check (true);
@@ -93,6 +121,8 @@ create policy "open_members"       on public.members            for all using (t
 create policy "open_stamps"        on public.stamps             for all using (true) with check (true);
 create policy "open_redemptions"   on public.redemptions        for all using (true) with check (true);
 create policy "open_push"          on public.push_subscriptions for all using (true) with check (true);
+create policy "open_sched"         on public.scheduled_pushes   for all using (true) with check (true);
+create policy "open_branches"      on public.branches           for all using (true) with check (true);
 
 -- ================================================================
 -- DEMO SEED DATA (optional — delete before production)

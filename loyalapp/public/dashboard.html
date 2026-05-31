@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--gold:#C9A84C;--bg:#0A0A0A;--s1:#141414;--s2:#1C1C1C;--s3:#242424;--b1:#1E1E1E;--b2:#2A2A2A;--b3:#3A3A3A;--t1:#F0EDE6;--t2:#9A9590;--t3:#585450;--r:12px;--rs:8px;--green:#4A9E6A;}
@@ -124,6 +125,40 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
 .plan-badge{box-shadow:0 0 12px rgba(201,168,76,0.15)}
 .push-notif{border-left:2px solid var(--gold)}
 .install-bar{box-shadow:0 4px 16px rgba(0,0,0,0.2)}
+
+/* ── ANALYTICS / BRANCHES / SCHEDULING ──────────────────── */
+.seg{display:inline-flex;background:var(--s2);border:1px solid var(--b2);border-radius:8px;padding:3px;gap:2px}
+.seg button{background:transparent;border:none;color:var(--t2);font-size:12px;padding:5px 12px;border-radius:6px;transition:all .15s}
+.seg button.on{background:var(--gold);color:#0A0A0A;font-weight:500}
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:680px){.chart-grid{grid-template-columns:1fr}}
+.chart-box{position:relative;height:240px;margin-top:8px}
+.chart-box.sm{height:200px}
+.mini-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.mini-stat{background:var(--s2);border:1px solid var(--b2);border-radius:var(--rs);padding:12px 14px}
+.mini-stat-val{font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--gold);line-height:1}
+.mini-stat-lbl{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-top:4px}
+.branch-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.branch-chip{display:inline-flex;align-items:center;gap:8px;background:var(--s2);border:1px solid var(--b2);border-radius:8px;padding:7px 12px;font-size:13px}
+.branch-chip i{color:var(--gold);font-size:14px}
+.branch-chip button{background:none;border:none;color:var(--t3);cursor:pointer;font-size:15px;line-height:1;padding:0;transition:color .15s}
+.branch-chip button:hover{color:#E05B5B}
+.push-mode{display:flex;gap:8px;margin-bottom:14px}
+.push-mode button{flex:1;background:var(--s2);border:1px solid var(--b2);border-radius:var(--rs);color:var(--t2);font-size:13px;padding:9px;transition:all .15s}
+.push-mode button.on{border-color:var(--gold);color:var(--gold);background:rgba(201,168,76,0.08)}
+.sched-item{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--b1)}
+.sched-item:last-child{border-bottom:none}
+.sched-ico{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:rgba(201,168,76,0.1)}
+.sched-ico i{color:var(--gold);font-size:14px}
+.sched-info{flex:1;min-width:0}
+.sched-title{font-size:13px;font-weight:500}
+.sched-meta{font-size:11px;color:var(--t3);font-family:'DM Mono',monospace;margin-top:2px}
+.sched-status{font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:3px 9px;border-radius:20px;flex-shrink:0}
+.st-pending{background:rgba(201,168,76,0.12);color:var(--gold)}
+.st-sent{background:rgba(74,158,106,0.15);color:var(--green)}
+.st-cancelled,.st-failed{background:rgba(224,91,91,0.12);color:#E05B5B}
+.sched-cancel{background:none;border:1px solid var(--b2);border-radius:6px;color:var(--t3);font-size:11px;padding:4px 10px;cursor:pointer;flex-shrink:0}
+.sched-cancel:hover{border-color:#E05B5B;color:#E05B5B}
 </style>
 </head>
 <body>
@@ -258,6 +293,36 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
       <div class="stat"><div class="stat-lbl">Redemptions</div><div class="stat-val" id="d-redeem">-</div><div class="stat-sub">this week</div></div>
     </div>
 
+    <!-- ANALYTICS -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+        <div>
+          <div class="card-title" style="margin-bottom:0"><i class="ti ti-chart-line" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>Analytics</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select class="members-search" id="an-branch" style="min-width:auto;width:auto;padding:7px 10px" onchange="loadAnalytics()">
+            <option value="all">All branches</option>
+          </select>
+          <div class="seg" id="an-range">
+            <button data-d="7" onclick="setRange(7,this)">7d</button>
+            <button data-d="30" class="on" onclick="setRange(30,this)">30d</button>
+            <button data-d="90" onclick="setRange(90,this)">90d</button>
+          </div>
+        </div>
+      </div>
+      <div class="mini-stats">
+        <div class="mini-stat"><div class="mini-stat-val" id="an-stamps">-</div><div class="mini-stat-lbl">Stamps (period)</div></div>
+        <div class="mini-stat"><div class="mini-stat-val" id="an-repeat">-</div><div class="mini-stat-lbl">Repeat rate</div></div>
+        <div class="mini-stat"><div class="mini-stat-val" id="an-redeem">-</div><div class="mini-stat-lbl">Redemptions</div></div>
+      </div>
+      <div class="chart-grid">
+        <div><div class="section-label">Stamps Trend</div><div class="chart-box"><canvas id="chart-stamps"></canvas></div></div>
+        <div><div class="section-label">New Members</div><div class="chart-box"><canvas id="chart-members"></canvas></div></div>
+        <div><div class="section-label">Top Services</div><div class="chart-box sm"><canvas id="chart-services"></canvas></div></div>
+        <div><div class="section-label">Member Tiers</div><div class="chart-box sm"><canvas id="chart-tiers"></canvas></div></div>
+      </div>
+    </div>
+
     <!-- MEMBERS TABLE -->
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px">
@@ -290,24 +355,48 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
 
     <!-- PUSH NOTIFICATION -->
     <div class="card">
-      <div class="card-title"><i class="ti ti-bell" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>Send Push Notification</div>
-      <div class="card-sub">Notify all your members instantly</div>
+      <div class="card-title"><i class="ti ti-bell" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>Marketing Notifications</div>
+      <div class="card-sub">Send now, schedule for later, or auto win-back lapsed customers</div>
+      <div class="push-mode">
+        <button id="pm-now" class="on" onclick="setPushMode('now')"><i class="ti ti-send" aria-hidden="true"></i> Send Now</button>
+        <button id="pm-schedule" onclick="setPushMode('schedule')"><i class="ti ti-clock" aria-hidden="true"></i> Schedule</button>
+        <button id="pm-winback" onclick="setPushMode('winback')"><i class="ti ti-heart-handshake" aria-hidden="true"></i> Win-Back</button>
+      </div>
       <div class="field"><label class="label">Title</label><input class="input" id="push-title" type="text" placeholder="Weekend Promo!" oninput="updatePreview()"></div>
       <div class="field"><label class="label">Message</label><input class="input" id="push-body" type="text" placeholder="Get 20% off all services this Saturday" oninput="updatePreview()"></div>
+      <div class="field" id="schedule-field" style="display:none"><label class="label">Send At</label><input class="input" id="push-when" type="datetime-local"></div>
+      <div class="field" id="winback-field" style="display:none"><label class="label">Target customers inactive for</label>
+        <select class="input" id="push-days" style="max-width:200px"><option value="7">7+ days</option><option value="14" selected>14+ days</option><option value="30">30+ days</option><option value="60">60+ days</option></select>
+        <div class="hint">Only members with no visits in this window will be notified. Leave title/message blank for a friendly default.</div>
+      </div>
       <div class="push-preview">
         <div style="font-size:11px;color:var(--t3);margin-bottom:8px">Preview</div>
         <div class="push-notif"><div class="push-notif-title" id="prev-title">Weekend Promo!</div><div class="push-notif-body" id="prev-body">Get 20% off all services this Saturday</div></div>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
-        <button class="btn btn-outline btn-sm" onclick="sendPush()"><i class="ti ti-send" aria-hidden="true"></i> Send to All Members</button>
+        <button class="btn btn-gold btn-sm" id="push-action-btn" style="width:auto" onclick="pushAction()"><i class="ti ti-send" aria-hidden="true"></i> Send to All Members</button>
         <div id="push-result" style="font-size:12px;color:var(--t3)"></div>
       </div>
+      <div class="divider" style="margin:18px 0 14px"></div>
+      <div class="section-label">Scheduled & Recent <span class="badge-count" id="sched-count">0</span></div>
+      <div id="sched-list"><div class="empty-sm">No scheduled notifications</div></div>
     </div>
 
     <!-- RECENT ACTIVITY -->
     <div class="card">
       <div class="card-title">Recent Activity</div>
       <div id="d-activity"><div class="loader"><i class="ti ti-loader-2" aria-hidden="true"></i></div></div>
+    </div>
+
+    <!-- BRANCHES -->
+    <div class="card">
+      <div class="card-title"><i class="ti ti-building-store" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>Branches / Locations</div>
+      <div class="card-sub">Add your outlets — staff pick a branch at login and analytics can be filtered per location</div>
+      <div style="display:flex;gap:8px;margin-bottom:4px">
+        <input class="input" id="branch-input" type="text" placeholder="e.g. Downtown Branch" style="flex:1" onkeydown="if(event.key==='Enter')addBranch()">
+        <button class="btn btn-outline btn-sm" onclick="addBranch()" style="white-space:nowrap"><i class="ti ti-plus" aria-hidden="true"></i> Add</button>
+      </div>
+      <div class="branch-chips" id="branch-chips"></div>
     </div>
 
     <!-- SETTINGS -->
@@ -332,8 +421,9 @@ const SUPA_URL='https://hrwoejdyjxpohdvfzcga.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhyd29lamR5anhwb2hkdmZ6Y2dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0Mjg0ODIsImV4cCI6MjA5NTAwNDQ4Mn0.YqfXjNFenVEp7Cu1zzMHagOqJOXtpLqMRX3z2Y3DwP4';
 const {createClient}=supabase;
 const db=createClient(SUPA_URL,SUPA_KEY);
-const S={user:null,merchant:null,services:[],allMembers:[],filteredMembers:[]};
+const S={user:null,merchant:null,services:[],allMembers:[],filteredMembers:[],branches:[],anDays:30,pushMode:'now'};
 let deferredInstall=null;
+const charts={};
 
 async function init(){
   const {data:{session}}=await db.auth.getSession();
@@ -422,6 +512,9 @@ async function showDashboard(){
   show('dashboard');
   loadStats();
   loadAllMembers();
+  loadBranches();
+  loadScheduled();
+  loadAnalytics();
 }
 
 async function loadStats(){
@@ -475,15 +568,130 @@ function exportCSV(){
   toast('CSV downloaded!');
 }
 
-// PUSH
+// ── PUSH / MARKETING ──────────────────────────────
 function updatePreview(){$('prev-title').textContent=$('push-title').value||'Title';$('prev-body').textContent=$('push-body').value||'Message body';}
-async function sendPush(){
+
+function setPushMode(mode){
+  S.pushMode=mode;
+  ['now','schedule','winback'].forEach(m=>$('pm-'+m).classList.toggle('on',m===mode));
+  $('schedule-field').style.display=mode==='schedule'?'block':'none';
+  $('winback-field').style.display=mode==='winback'?'block':'none';
+  const btn=$('push-action-btn');
+  if(mode==='now')btn.innerHTML='<i class="ti ti-send"></i> Send to All Members';
+  else if(mode==='schedule')btn.innerHTML='<i class="ti ti-clock"></i> Schedule Notification';
+  else btn.innerHTML='<i class="ti ti-heart-handshake"></i> Send Win-Back Campaign';
+}
+
+function pushAction(){
+  if(S.pushMode==='now')doSendNow();
+  else if(S.pushMode==='schedule')doSchedule();
+  else doWinback();
+}
+
+async function doSendNow(){
   const title=$('push-title').value.trim(),body=$('push-body').value.trim();
   if(!title||!body){toast('Enter title and message');return;}
   const res=await fetch(API+'/api/push/broadcast',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({merchantId:S.merchant.id,title,body})});
   const data=await res.json();
   $('push-result').textContent='Sent to '+data.sent+' member'+(data.sent!==1?'s':'');
   toast('Notification sent!');
+}
+
+async function doSchedule(){
+  const title=$('push-title').value.trim(),body=$('push-body').value.trim(),when=$('push-when').value;
+  if(!title||!body){toast('Enter title and message');return;}
+  if(!when){toast('Pick a send time');return;}
+  if(new Date(when)<=new Date()){toast('Pick a future time');return;}
+  const res=await fetch(API+'/api/push/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({merchantId:S.merchant.id,title,body,scheduledAt:new Date(when).toISOString()})});
+  if(res.ok){toast('Notification scheduled!');$('push-when').value='';$('push-result').textContent='Scheduled';loadScheduled();}
+  else toast('Could not schedule');
+}
+
+async function doWinback(){
+  const title=$('push-title').value.trim(),body=$('push-body').value.trim(),days=parseInt($('push-days').value);
+  const res=await fetch(API+'/api/push/winback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({merchantId:S.merchant.id,days,title:title||undefined,body:body||undefined})});
+  const data=await res.json();
+  if(res.ok){$('push-result').textContent='Reached '+data.sent+' of '+data.targeted+' lapsed members';toast('Win-back campaign sent!');}
+  else toast(data.error||'Could not send');
+}
+
+async function loadScheduled(){
+  const list=await fetch(API+'/api/push/scheduled/'+S.merchant.id).then(r=>r.json()).catch(()=>[]);
+  renderScheduled(list||[]);
+}
+
+function renderScheduled(list){
+  $('sched-count').textContent=list.filter(s=>s.status==='pending').length;
+  const box=$('sched-list');
+  if(!list.length){box.innerHTML='<div class="empty-sm">No scheduled notifications</div>';return;}
+  box.innerHTML=list.map(s=>{
+    const meta=s.status==='sent'?('Sent to '+s.sent_count+' · '+fmtDateTime(s.sent_at||s.scheduled_at)):fmtDateTime(s.scheduled_at);
+    const cancel=s.status==='pending'?'<button class="sched-cancel" onclick="cancelScheduled(\''+s.id+'\')">Cancel</button>':'';
+    return '<div class="sched-item"><div class="sched-ico"><i class="ti ti-bell" aria-hidden="true"></i></div><div class="sched-info"><div class="sched-title">'+esc(s.title)+'</div><div class="sched-meta">'+meta+'</div></div><span class="sched-status st-'+s.status+'">'+s.status+'</span>'+cancel+'</div>';
+  }).join('');
+}
+
+async function cancelScheduled(id){
+  await fetch(API+'/api/push/scheduled/'+id,{method:'DELETE'});
+  toast('Cancelled');loadScheduled();
+}
+
+// ── BRANCHES ──────────────────────────────
+async function loadBranches(){
+  const list=await fetch(API+'/api/branches/'+S.merchant.id).then(r=>r.json()).catch(()=>[]);
+  S.branches=list||[];renderBranches();
+  const sel=$('an-branch'),cur=sel.value;
+  sel.innerHTML='<option value="all">All branches</option>'+S.branches.map(b=>'<option value="'+esc(b.name)+'">'+esc(b.name)+'</option>').join('');
+  sel.value=cur||'all';
+}
+
+function renderBranches(){
+  const box=$('branch-chips');
+  if(!S.branches.length){box.innerHTML='<div class="empty-sm" style="padding:8px 0">No branches yet — add your first location above</div>';return;}
+  box.innerHTML=S.branches.map(b=>'<span class="branch-chip"><i class="ti ti-map-pin" aria-hidden="true"></i>'+esc(b.name)+'<button onclick="deleteBranch(\''+b.id+'\')" aria-label="Remove" title="Remove">×</button></span>').join('');
+}
+
+async function addBranch(){
+  const name=$('branch-input').value.trim();
+  if(!name)return;
+  const res=await fetch(API+'/api/branches',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({merchantId:S.merchant.id,name})});
+  const data=await res.json();
+  if(!res.ok){toast(data.error||'Error');return;}
+  $('branch-input').value='';loadBranches();toast('Branch added');
+}
+
+async function deleteBranch(id){
+  await fetch(API+'/api/branches/'+id,{method:'DELETE'});
+  loadBranches();toast('Branch removed');
+}
+
+// ── ANALYTICS ──────────────────────────────
+function setRange(d,el){S.anDays=d;document.querySelectorAll('#an-range button').forEach(b=>b.classList.remove('on'));el.classList.add('on');loadAnalytics();}
+
+async function loadAnalytics(){
+  const branch=$('an-branch').value;
+  const data=await fetch(API+'/api/analytics/'+S.merchant.id+'?days='+S.anDays+'&branch='+encodeURIComponent(branch)).then(r=>r.json()).catch(()=>null);
+  if(!data)return;
+  $('an-stamps').textContent=data.totalStamps;
+  $('an-repeat').textContent=data.repeatRate+'%';
+  $('an-redeem').textContent=data.totalRedemptions;
+  renderCharts(data);
+}
+
+const GOLD='#C9A84C',GREEN='#4A9E6A',PIE=['#C9A84C','#4A9E6A','#5B8DEF','#E0795B','#9B59B6','#E0C05B','#5BC8C8'];
+if(window.Chart){Chart.defaults.color='#9A9590';Chart.defaults.font.family="'DM Sans',sans-serif";Chart.defaults.font.size=11;}
+function fmtDay(s){return new Date(s).toLocaleDateString('en-MY',{day:'numeric',month:'short'});}
+function lineCfg(labels,data,color){return{type:'line',data:{labels,datasets:[{data,borderColor:color,backgroundColor:color+'22',fill:true,tension:0.35,pointRadius:0,borderWidth:2}]},options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:6}},y:{beginAtZero:true,grid:{color:'#1E1E1E'},ticks:{precision:0,maxTicksLimit:5}}},maintainAspectRatio:false}};}
+function barCfg(labels,data,color){return{type:'bar',data:{labels,datasets:[{data,backgroundColor:color+'cc',borderRadius:4}]},options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:6}},y:{beginAtZero:true,grid:{color:'#1E1E1E'},ticks:{precision:0,maxTicksLimit:5}}},maintainAspectRatio:false}};}
+function dougCfg(labels,data){return{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:PIE,borderColor:'#141414',borderWidth:2}]},options:{plugins:{legend:{position:'right',labels:{boxWidth:10,padding:8}}},cutout:'62%',maintainAspectRatio:false}};}
+function draw(key,canvasId,cfg){if(charts[key])charts[key].destroy();charts[key]=new Chart($(canvasId),cfg);}
+function renderCharts(d){
+  draw('stamps','chart-stamps',lineCfg(d.dailyStamps.map(x=>fmtDay(x.date)),d.dailyStamps.map(x=>x.count),GOLD));
+  draw('members','chart-members',barCfg(d.dailyMembers.map(x=>fmtDay(x.date)),d.dailyMembers.map(x=>x.count),GREEN));
+  const svc=d.serviceBreakdown.slice(0,7);
+  draw('services','chart-services',svc.length?dougCfg(svc.map(x=>x.label),svc.map(x=>x.count)):dougCfg(['No data'],[1]));
+  const tl=['Bronze','Silver','Gold','Platinum'];
+  draw('tiers','chart-tiers',dougCfg(tl,tl.map(t=>d.tierBreakdown[t]||0)));
 }
 
 // SETTINGS
@@ -499,6 +707,7 @@ function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.remo
 function $(id){return document.getElementById(id);}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function fmtTime(s){const d=new Date(s),t=new Date();return d.toDateString()===t.toDateString()?d.toLocaleTimeString('en-MY',{hour:'2-digit',minute:'2-digit'}):d.toLocaleDateString('en-MY',{day:'numeric',month:'short'});}
+function fmtDateTime(s){return new Date(s).toLocaleString('en-MY',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});}
 let _tt;function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('on');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('on'),2500);}
 
 init();
