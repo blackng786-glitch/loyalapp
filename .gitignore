@@ -5,3 +5,4 @@ node_modules/
 _check.js
 .DS_Store
 loyalapp/node_modules/
+package-lock.json
