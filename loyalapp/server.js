@@ -157,6 +157,29 @@ app.get('/api/members/search', async (req, res) => {
   res.json(members.map(m => ({ ...m, stampCount: sc[m.id] || 0, redeemCount: rc[m.id] || 0 })));
 });
 
+// ── ALL MEMBERS (staff/dashboard) ─────────────────────────────
+app.get('/api/members/all', async (req, res) => {
+  const { merchantId } = req.query;
+  if (!merchantId) return res.status(400).json({ error: 'merchantId required' });
+  const { data: members } = await db.from('members').select('*')
+    .eq('merchant_id', merchantId).order('created_at', { ascending: false });
+  if (!members?.length) return res.json([]);
+  const ids = members.map(m => m.id);
+  const { data: stampRows } = await db.from('stamps').select('member_id').in('member_id', ids);
+  const { data: redeemRows } = await db.from('redemptions').select('member_id').in('member_id', ids);
+  const sc = {}, rc = {};
+  (stampRows || []).forEach(s => sc[s.member_id] = (sc[s.member_id] || 0) + 1);
+  (redeemRows || []).forEach(r => rc[r.member_id] = (rc[r.member_id] || 0) + 1);
+  res.json(members.map(m => {
+    const stamps = sc[m.id] || 0;
+    let tier = 'Bronze';
+    if (stamps >= 200) tier = 'Platinum';
+    else if (stamps >= 100) tier = 'Gold';
+    else if (stamps >= 50) tier = 'Silver';
+    return { ...m, stampCount: stamps, redeemCount: rc[m.id] || 0, tier };
+  }));
+});
+
 // ── ADD STAMP ────────────────────────────────────────────────
 app.post('/api/stamp', async (req, res) => {
   const { memberId, merchantId, service, staffPin } = req.body;
