@@ -1,0 +1,37 @@
+name: Supabase Keep-Alive
+
+# 背景: Supabase 免费项目闲置 7 天会被自动暂停, 导致网站 "Failed to fetch"。
+# 这个定时任务每 3 天对数据库发一次轻量查询, 保持项目活跃, 根治暂停问题。
+#
+# 注意: 这里直接使用 anon (公开) key —— 它本来就公开在前端 HTML 中, 受 Supabase
+# 行级安全(RLS)保护, 放在这里没有额外安全风险, 好处是你无需配置任何 Secret。
+# 若以后想改用 Secret, 把下面两行换成 ${{ secrets.SUPABASE_URL }} 等即可。
+
+on:
+  schedule:
+    # 每 3 天 UTC 06:00 运行 (最长间隔 < 7 天暂停阈值, 留足安全余量)
+    - cron: '0 6 */3 * *'
+  workflow_dispatch:   # 也可在 GitHub Actions 页面手动点 "Run workflow"
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase to keep it awake
+        run: |
+          SUPABASE_URL="https://hrwoejdyjxpohdvfzcga.supabase.co"
+          ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhyd29lamR5anhwb2hkdmZ6Y2dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0Mjg0ODIsImV4cCI6MjA5NTAwNDQ4Mn0.YqfXjNFenVEp7Cu1zzMHagOqJOXtpLqMRX3z2Y3DwP4"
+          echo "Pinging Supabase to keep project active..."
+          HTTP_CODE=$(curl -s -o /tmp/resp.txt -w "%{http_code}" \
+            "${SUPABASE_URL}/rest/v1/merchants?select=count&limit=1" \
+            -H "apikey: ${ANON_KEY}" \
+            -H "Authorization: Bearer ${ANON_KEY}")
+          echo "HTTP status: $HTTP_CODE"
+          cat /tmp/resp.txt
+          echo ""
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
+            echo "✅ Supabase is alive."
+          else
+            echo "❌ Supabase ping failed (HTTP $HTTP_CODE)"
+            exit 1
+          fi
