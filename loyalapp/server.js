@@ -6,7 +6,7 @@ const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '6mb' }));   // 6mb 以容纳 base64 logo 上传
 app.use(express.static('public'));
 
 // ── DB (service key for server-side operations) ──────────────
@@ -52,11 +52,13 @@ app.get('/api/vapid-key', (req, res) => {
 // ── MERCHANT PUBLIC INFO ──────────────────────────────────────
 app.get('/api/merchant/:slug', async (req, res) => {
   const { data, error } = await db.from('merchants')
-    .select('id,name,slug,brand_color,logo_text,stamps_per_card,reward_name,reward_value,services')
+    .select('id,name,slug,brand_color,logo_text,logo_url,stamps_per_card,reward_name,reward_value,services')
     .eq('slug', req.params.slug)
     .maybeSingle();
   if (!data) return res.status(404).json({ error: 'Merchant not found' });
-  res.json(data);
+  // 兼容别名: stamp_goal / reward_text
+  res.json({ ...data, stamp_goal: data.stamps_per_card,
+    reward_text: data.reward_value ? `${data.reward_name} (${data.reward_value})` : data.reward_name });
 });
 
 // ── MERCHANT BY AUTH ID ───────────────────────────────────────
@@ -72,7 +74,7 @@ app.post('/api/merchant', async (req, res) => {
   const { data, error } = await db.from('merchants').insert({
     name, slug, email,
     auth_id: authId,
-    brand_color: brandColor || '#C9A84C',
+    brand_color: brandColor || '#993C1D',
     logo_text: logoText || name.substring(0,6).toUpperCase(),
     stamps_per_card: stampsPerCard || 10,
     reward_name: rewardName || 'Free Item',
@@ -94,6 +96,47 @@ app.patch('/api/merchant/:id', async (req, res) => {
   res.json(data);
 });
 
+// ── UPDATE BRANDING (color + logo_url) by slug ────────────────
+app.put('/api/merchant/:slug/branding', async (req, res) => {
+  const { brand_color, logo_url } = req.body;
+  const patch = {};
+  if (brand_color !== undefined) patch.brand_color = brand_color;
+  if (logo_url !== undefined) patch.logo_url = logo_url;
+  if (!Object.keys(patch).length) return res.status(400).json({ error: 'nothing to update' });
+  const { error } = await db.from('merchants').update(patch).eq('slug', req.params.slug);
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// ── UPLOAD LOGO (base64 → Supabase Storage 'logos' bucket) ────
+app.post('/api/merchant/:slug/upload-logo', async (req, res) => {
+  try {
+    const { fileBase64 } = req.body;
+    if (!fileBase64) return res.status(400).json({ error: 'fileBase64 required' });
+    const m = fileBase64.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+    if (!m) return res.status(400).json({ error: 'invalid image data' });
+    const contentType = m[1];
+    const ext = (contentType.split('/')[1] || 'png').replace('jpeg', 'jpg').split('+')[0];
+    const buffer = Buffer.from(m[2], 'base64');
+    if (buffer.length > 5 * 1024 * 1024) return res.status(400).json({ error: 'image too large (max 5MB)' });
+
+    // 确保 'logos' 公开桶存在 (service key 可建; 已存在则忽略错误)
+    await db.storage.createBucket('logos', { public: true }).catch(() => {});
+
+    const path = `${req.params.slug}/logo-${Date.now()}.${ext}`;
+    const up = await db.storage.from('logos').upload(path, buffer, { contentType, upsert: true });
+    if (up.error) return res.status(400).json({ error: 'upload failed: ' + up.error.message });
+
+    const { data: pub } = db.storage.from('logos').getPublicUrl(path);
+    const url = pub.publicUrl;
+    // 顺手写入 merchants.logo_url
+    await db.from('merchants').update({ logo_url: url }).eq('slug', req.params.slug);
+    res.json({ url });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── MEMBER LOOKUP ─────────────────────────────────────────────
 app.get('/api/member', async (req, res) => {
   const { phone, merchantId } = req.query;
@@ -108,8 +151,26 @@ app.get('/api/member', async (req, res) => {
   res.json(data);
 });
 
+// ── MEMBER LOOKUP BY PHONE (path-param alias) ─────────────────
+app.get('/api/member/:phone', async (req, res) => {
+  const { merchantId } = req.query;
+  const phone = req.params.phone;
+  const clean = phone.replace(/\D/g, '');
+  let { data } = await db.from('members').select('*')
+    .eq('merchant_id', merchantId).eq('phone', phone).maybeSingle();
+  if (!data) {
+    const r = await db.from('members').select('*')
+      .eq('merchant_id', merchantId).ilike('phone', '%' + clean + '%').limit(1);
+    data = r.data?.[0] || null;
+  }
+  if (!data) return res.json(null);
+  const { count } = await db.from('stamps')
+    .select('*', { count: 'exact', head: true }).eq('member_id', data.id);
+  res.json({ ...data, total_stamps: count || 0, stamps: count || 0 });
+});
+
 // ── REGISTER MEMBER ───────────────────────────────────────────
-app.post('/api/member', async (req, res) => {
+async function registerMember(req, res) {
   const { name, phone, merchantId } = req.body;
   const { data, error } = await db.from('members')
     .insert({ name, phone, merchant_id: merchantId }).select().single();
@@ -118,7 +179,9 @@ app.post('/api/member', async (req, res) => {
     return res.status(400).json({ error: error.message });
   }
   res.json(data);
-});
+}
+app.post('/api/member', registerMember);
+app.post('/api/member/register', registerMember);   // alias
 
 // ── MEMBER ACTIVITY ───────────────────────────────────────────
 app.get('/api/member/:id/activity', async (req, res) => {
@@ -177,7 +240,7 @@ app.get('/api/members/all', async (req, res) => {
     if (stamps >= 200) tier = 'Platinum';
     else if (stamps >= 100) tier = 'Gold';
     else if (stamps >= 50) tier = 'Silver';
-    return { ...m, stampCount: stamps, redeemCount: rc[m.id] || 0, tier };
+    return { ...m, stampCount: stamps, total_stamps: stamps, redeemCount: rc[m.id] || 0, tier };
   }));
 });
 
