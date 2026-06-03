@@ -17,7 +17,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-:root{--brand:#D85A30;--brand-r:216;--brand-g:90;--brand-b:48;--bg:#1A1A1A;--s1:#141414;--s2:#1C1C1C;--s3:#242424;--b1:#1E1E1E;--b2:#2A2A2A;--b3:#3A3A3A;--t1:#F0EDE6;--t2:#9A9590;--t3:#585450;--r:12px;--rs:8px;
+:root{--brand:#D85A30;--brand-r:216;--brand-g:90;--brand-b:48;--bg:#1B1917;--s1:#221F1D;--s2:#2A2624;--s3:#332E2B;--b1:#2A2624;--b2:#36302C;--b3:#463E38;--t1:#F1ECE6;--t2:#A39C94;--t3:#6E665E;--r:12px;--rs:8px;
 --ck-primary:#993C1D;--ck-accent:#D85A30;--ck-light:#FAECE7;--ck-ink:#2C2C2A;--ck-muted:#888780;--ck-surface:#F7F5F3;--card-text:#FFFFFF;}
 html,body{height:100%;background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-size:15px;overflow-x:hidden}
 input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
@@ -419,7 +419,7 @@ function applyBranding(m){
   // 整页随品牌色明暗自适应 (浅色品牌->浅色页面, 深色品牌->深色页面)
   const T=lightPage
     ?{bg:'#F7F5F3',s1:'#FFFFFF',s2:'#FAF8F6',s3:'#F0EDEA',b1:'#ECE8E4',b2:'#E0DBD6',b3:'#CFC9C2',t1:'#22201E',t2:'#6B6760',t3:'#9A958E'}
-    :{bg:'#1A1A1A',s1:'#141414',s2:'#1C1C1C',s3:'#242424',b1:'#1E1E1E',b2:'#2A2A2A',b3:'#3A3A3A',t1:'#F0EDE6',t2:'#9A9590',t3:'#585450'};
+    :{bg:'#1B1917',s1:'#221F1D',s2:'#2A2624',s3:'#332E2B',b1:'#2A2624',b2:'#36302C',b3:'#463E38',t1:'#F1ECE6',t2:'#A39C94',t3:'#6E665E'};
   for(const k in T)root.setProperty('--'+k,T[k]);
   const mt=document.getElementById('meta-theme');if(mt)mt.content=T.bg;
   const logo=m.logo_text||m.name.substring(0,6).toUpperCase();

@@ -10,16 +10,24 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--gold:#D85A30;--bg:#0A0A0A;--s1:#141414;--s2:#1C1C1C;--s3:#242424;--b1:#1E1E1E;--b2:#2A2A2A;--b3:#3A3A3A;--t1:#F0EDE6;--t2:#9A9590;--t3:#585450;--r:12px;--rs:8px;--green:#4A9E6A;--ck-primary:#993C1D;--ck-accent:#D85A30;--ck-light:#FAECE7;--ck-muted:#888780;--ck-surface:#F7F5F3;}
+:root{--gold:#D85A30;--bg:#1B1917;--s1:#221F1D;--s2:#2A2624;--s3:#332E2B;--b1:#2A2624;--b2:#36302C;--b3:#463E38;--t1:#F1ECE6;--t2:#A39C94;--t3:#6E665E;--r:12px;--rs:8px;--green:#4A9E6A;--ck-primary:#993C1D;--ck-accent:#D85A30;--ck-light:#FAECE7;--ck-muted:#888780;--ck-surface:#F7F5F3;}
 html,body{min-height:100%;background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-size:15px}
 input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:pointer}
 .app{display:flex;flex-direction:column;min-height:100vh}
 .view{display:none;flex:1;flex-direction:column}
 .view.on{display:flex}
-.nav{padding:13px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--b1);background:rgba(10,10,10,0.96);position:sticky;top:0;z-index:50;backdrop-filter:blur(12px)}
+.nav{padding:13px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--b1);background:rgba(27,25,23,0.96);position:sticky;top:0;z-index:50;backdrop-filter:blur(12px)}
 .nav-brand{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;color:var(--gold)}
 .nav-right{display:flex;align-items:center;gap:10px}
 .nav-user{font-size:13px;color:var(--t2)}
+@media(max-width:640px){
+  .nav{padding:11px 14px}
+  .nav-brand{font-size:18px}
+  .nav-user{display:none}
+  .nav .plan-badge{display:none}
+  .nav-right{gap:6px}
+  .nav-btn{padding:6px 10px;font-size:12px}
+}
 .nav-btn{background:transparent;border:1px solid var(--b3);border-radius:20px;padding:5px 14px;color:var(--t2);font-size:12px;transition:all .2s}
 .nav-btn:hover{color:var(--t1)}
 .plan-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;letter-spacing:1px;text-transform:uppercase;background:rgba(216,90,48,0.12);color:var(--gold);border:1px solid rgba(216,90,48,0.25)}
@@ -505,7 +513,7 @@ async function signUp(){
   btn.disabled=false;btn.innerHTML='<i class="ti ti-user-plus"></i> Create Account';
 }
 
-async function signOut(){await db.auth.signOut();location.reload();}
+async function signOut(){try{await db.auth.signOut();}catch(e){} location.reload();}
 function toggleSignup(){const a=$('auth-form'),b=$('signup-form');a.style.display=a.style.display==='none'?'flex':'none';b.style.display=b.style.display==='none'?'flex':'none';}
 
 async function loadMerchant(){
