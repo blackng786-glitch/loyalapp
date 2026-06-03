@@ -18,19 +18,19 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{--brand:#D85A30;--brand-r:216;--brand-g:90;--brand-b:48;--bg:#1A1A1A;--s1:#141414;--s2:#1C1C1C;--s3:#242424;--b1:#1E1E1E;--b2:#2A2A2A;--b3:#3A3A3A;--t1:#F0EDE6;--t2:#9A9590;--t3:#585450;--r:12px;--rs:8px;
---ck-primary:#993C1D;--ck-accent:#D85A30;--ck-light:#FAECE7;--ck-ink:#2C2C2A;--ck-muted:#888780;--ck-surface:#F7F5F3;}
+--ck-primary:#993C1D;--ck-accent:#D85A30;--ck-light:#FAECE7;--ck-ink:#2C2C2A;--ck-muted:#888780;--ck-surface:#F7F5F3;--card-text:#FFFFFF;}
 html,body{height:100%;background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-size:15px;overflow-x:hidden}
 input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
 .app{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
 .view{display:none;flex-direction:column;flex:1;max-width:430px;margin:0 auto;width:100%}
 .view.on{display:flex}
-.nav{padding:13px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--b1);background:rgba(10,10,10,0.94);backdrop-filter:blur(12px);flex-shrink:0;position:sticky;top:0;z-index:50}
+.nav{padding:13px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--b1);background:var(--s2);backdrop-filter:blur(12px);flex-shrink:0;position:sticky;top:0;z-index:50}
 .nav-brand{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:3px;color:var(--brand)}
 .nav-btn{background:transparent;border:1px solid var(--b3);border-radius:20px;padding:5px 14px;color:var(--t2);font-size:12px;transition:all .2s}
 .btn{width:100%;padding:14px;border-radius:var(--rs);border:none;font-size:15px;font-weight:500;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:7px}
 .btn:active{transform:scale(0.97)}
 .btn:disabled{opacity:0.4;cursor:not-allowed;transform:none}
-.btn-brand{background:var(--brand);color:#0A0A0A}
+.btn-brand{background:var(--brand);color:var(--card-text)}
 .btn-outline{background:transparent;border:1px solid var(--b3);color:var(--t2)}
 .input{width:100%;padding:14px 16px;background:var(--s1);border:1px solid var(--b2);border-radius:var(--rs);color:var(--t1);font-size:15px;outline:none;transition:border .2s;-webkit-appearance:none}
 .input:focus{border-color:var(--brand)}
@@ -50,21 +50,21 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
 .install-body{flex:1}
 .install-title{font-size:13px;font-weight:500;margin-bottom:2px}
 .install-sub{font-size:11px;color:var(--t2)}
-.install-action{background:var(--brand);border:none;border-radius:7px;color:#0A0A0A;font-size:12px;font-weight:500;padding:7px 14px;white-space:nowrap;cursor:pointer;flex-shrink:0}
+.install-action{background:var(--brand);border:none;border-radius:7px;color:var(--card-text);font-size:12px;font-weight:500;padding:7px 14px;white-space:nowrap;cursor:pointer;flex-shrink:0}
 .phone-row{display:flex;gap:8px}
 .cc-select{background:var(--s1);border:1px solid var(--b2);border-radius:var(--rs);color:var(--t1);font-size:13px;padding:14px 8px;outline:none;-webkit-appearance:none;flex-shrink:0;width:110px;cursor:pointer;transition:border .2s}
 .cc-select:focus{border-color:var(--brand)}
 .phone-input{flex:1}
-.m-card{margin:14px 16px;border-radius:16px;padding:20px;position:relative;overflow:hidden;flex-shrink:0;border:1px solid rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.4);background:linear-gradient(135deg,rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.06),rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.02))}
-.m-card::after{content:'';position:absolute;top:-30px;right:-30px;width:110px;height:110px;border-radius:50%;border:1px solid rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.08);pointer-events:none}
+.m-card{margin:14px 16px;border-radius:16px;padding:20px;position:relative;overflow:hidden;flex-shrink:0;background:var(--brand);color:var(--card-text);box-shadow:0 10px 28px rgba(0,0,0,0.18)}
+.m-card::after{content:'';position:absolute;top:-30px;right:-30px;width:110px;height:110px;border-radius:50%;border:1px solid currentColor;opacity:.18;pointer-events:none}
 .mc-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
-.mc-brand{font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:3px;color:var(--brand)}
-.mc-tier{font-size:10px;color:var(--brand);background:rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.12);border:1px solid rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.25);border-radius:20px;padding:3px 10px;letter-spacing:1px}
-.mc-name{font-size:18px;font-weight:500;margin-bottom:2px}
-.mc-phone{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);letter-spacing:1px;margin-bottom:14px}
+.mc-brand{font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:3px;color:var(--card-text)}
+.mc-tier{font-size:10px;color:var(--card-text);background:transparent;border:1px solid currentColor;border-radius:20px;padding:3px 10px;letter-spacing:1px;opacity:.85}
+.mc-name{font-size:18px;font-weight:500;margin-bottom:2px;color:var(--card-text)}
+.mc-phone{font-family:'DM Mono',monospace;font-size:11px;color:var(--card-text);opacity:.72;letter-spacing:1px;margin-bottom:14px}
 .mc-stats{display:flex;gap:24px}
-.mc-val{font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--brand);line-height:1}
-.mc-lbl{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:1px}
+.mc-val{font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--card-text);line-height:1}
+.mc-lbl{font-size:10px;color:var(--card-text);opacity:.72;text-transform:uppercase;letter-spacing:1px}
 .tabs{display:flex;border-bottom:1px solid var(--b1);flex-shrink:0;padding:0 2px}
 .tab{flex:1;padding:10px 4px;border:none;background:transparent;color:var(--t3);font-size:12px;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s}
 .tab.on{color:var(--brand);border-bottom-color:var(--brand)}
@@ -76,7 +76,7 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
 .s-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
 .stamp{aspect-ratio:1;border-radius:50%;border:1.5px solid var(--b3);display:flex;align-items:center;justify-content:center;transition:all .3s}
 .stamp.on{background:var(--brand);border-color:var(--brand)}
-.stamp.on i{color:#0A0A0A;font-size:13px}
+.stamp.on i{color:var(--card-text);font-size:13px}
 .stamp.off i{color:var(--b3);font-size:13px}
 .s-note{grid-column:span 5;text-align:center;font-size:11px;color:var(--t3);margin-top:6px}
 .prog{background:var(--s3);border-radius:20px;height:5px;margin:8px 0}
@@ -94,7 +94,7 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
 .rw-desc{font-size:11px;color:var(--t2);margin-top:2px}
 .rw-req{font-size:11px;color:var(--brand);margin-top:3px}
 .btn-rw{padding:6px 13px;border-radius:6px;border:1px solid rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.4);background:transparent;color:var(--brand);font-size:12px;transition:all .2s;flex-shrink:0}
-.btn-rw:hover:not(:disabled){background:var(--brand);color:#0A0A0A}
+.btn-rw:hover:not(:disabled){background:var(--brand);color:var(--card-text)}
 .btn-rw:disabled{border-color:var(--b2);color:var(--t3);cursor:not-allowed}
 .h-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--b1)}
 .h-item:last-child{border-bottom:none}
@@ -409,11 +409,19 @@ async function doInstall(){
 }
 
 function applyBranding(m){
-  const hex=m.brand_color||'#C9A84C';
+  const hex=(m.brand_color||'#993C1D').trim();
   const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  const lum=r*0.299+g*0.587+b*0.114;            // 0(黑)~255(白)
+  const lightPage=lum>150;                       // 浅色品牌 -> 整页浅色
   const root=document.documentElement.style;
   root.setProperty('--brand',hex);root.setProperty('--brand-r',r);root.setProperty('--brand-g',g);root.setProperty('--brand-b',b);
-  // ChopKar 平台主题色固定深色, 不被商家覆盖 (仅会员卡用商家色)
+  root.setProperty('--card-text',lightPage?'#1A1A1A':'#FFFFFF');
+  // 整页随品牌色明暗自适应 (浅色品牌->浅色页面, 深色品牌->深色页面)
+  const T=lightPage
+    ?{bg:'#F7F5F3',s1:'#FFFFFF',s2:'#FAF8F6',s3:'#F0EDEA',b1:'#ECE8E4',b2:'#E0DBD6',b3:'#CFC9C2',t1:'#22201E',t2:'#6B6760',t3:'#9A958E'}
+    :{bg:'#1A1A1A',s1:'#141414',s2:'#1C1C1C',s3:'#242424',b1:'#1E1E1E',b2:'#2A2A2A',b3:'#3A3A3A',t1:'#F0EDE6',t2:'#9A9590',t3:'#585450'};
+  for(const k in T)root.setProperty('--'+k,T[k]);
+  const mt=document.getElementById('meta-theme');if(mt)mt.content=T.bg;
   const logo=m.logo_text||m.name.substring(0,6).toUpperCase();
   document.title=m.name+' · ChopKar';
   ['reg-brand','mem-brand'].forEach(id=>{const el=$(id);if(el)el.textContent=logo;});
