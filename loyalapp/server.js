@@ -51,10 +51,13 @@ app.get('/api/vapid-key', (req, res) => {
 
 // ── MERCHANT PUBLIC INFO ──────────────────────────────────────
 app.get('/api/merchant/:slug', async (req, res) => {
-  const { data, error } = await db.from('merchants')
-    .select('id,name,slug,brand_color,bg_color,logo_text,logo_url,stamps_per_card,reward_name,reward_value,services')
-    .eq('slug', req.params.slug)
-    .maybeSingle();
+  const full = 'id,name,slug,brand_color,bg_color,logo_text,logo_url,stamps_per_card,reward_name,reward_value,services';
+  const safe = 'id,name,slug,brand_color,logo_text,logo_url,stamps_per_card,reward_name,reward_value,services';
+  let { data } = await db.from('merchants').select(full).eq('slug', req.params.slug).maybeSingle();
+  if (!data) {   // 兼容: bg_color 列可能尚未建(migration-v4 未跑), 去掉后重试
+    const r = await db.from('merchants').select(safe).eq('slug', req.params.slug).maybeSingle();
+    data = r.data;
+  }
   if (!data) return res.status(404).json({ error: 'Merchant not found' });
   // 兼容别名: stamp_goal / reward_text
   res.json({ ...data, stamp_goal: data.stamps_per_card,
