@@ -419,6 +419,12 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
             <div class="color-row" id="brand-presets"></div>
           </div>
           <div class="field">
+            <label class="label">Page Background 页面背景色</label>
+            <input class="input" id="set-bg" type="color" style="height:46px;padding:4px 8px;cursor:pointer" oninput="onBgColor(this.value)">
+            <div class="color-row" id="bg-presets"></div>
+            <div class="hint">顾客会员卡页面背景 · <a href="javascript:void(0)" onclick="resetBg()" style="color:var(--gold)">恢复自动</a></div>
+          </div>
+          <div class="field">
             <label class="label">Logo</label>
             <input type="file" id="logo-file" accept="image/*" style="display:none" onchange="onLogoFile(event)">
             <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
@@ -434,14 +440,16 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
         </div>
         <div>
           <div class="label" style="margin-bottom:8px">实时预览 Live Preview</div>
-          <div id="brand-preview" style="border-radius:16px;padding:20px;min-height:160px;display:flex;flex-direction:column;justify-content:space-between;background:#993C1D;color:#fff">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start">
-              <div id="prev-logo" style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px">YOUR BRAND</div>
-              <div style="font-size:10px;opacity:.85;border:1px solid currentColor;border-radius:20px;padding:3px 10px">Bronze</div>
-            </div>
-            <div>
-              <div id="prev-reward" style="font-size:12px;opacity:.9;margin-bottom:10px">集满印章换取免费奖励</div>
-              <div id="prev-dots" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+          <div id="bg-preview" style="border-radius:16px;padding:18px;background:#1B1917;transition:background .2s">
+            <div id="brand-preview" style="border-radius:14px;padding:20px;min-height:150px;display:flex;flex-direction:column;justify-content:space-between;background:#993C1D;color:#fff">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div id="prev-logo" style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px">YOUR BRAND</div>
+                <div style="font-size:10px;opacity:.85;border:1px solid currentColor;border-radius:20px;padding:3px 10px">Bronze</div>
+              </div>
+              <div>
+                <div id="prev-reward" style="font-size:12px;opacity:.9;margin-bottom:10px">集满印章换取免费奖励</div>
+                <div id="prev-dots" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -737,24 +745,31 @@ function renderCharts(d){
 
 // ── BRANDING 品牌设置 ──────────────────────────────
 const BRAND_PRESETS=['#993C1D','#C0392B','#D85A30','#E8943A','#F4B400','#F6C453','#2E7D5B','#43A047','#7CB342','#00897B','#2C6E9B','#1E88E5','#5E35B1','#8E44AD','#D81B60','#EC6F9B','#6D4C41','#37474F','#F2D9CE','#F7F5F3'];
+const BG_PRESETS=['#1B1917','#101216','#23262C','#3A2C28','#0E1A14','#F7F5F3','#FBF4EC','#EAF1F5','#F3ECF5','#E9F2EC'];
+function autoBg(h){const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);return (r*0.299+g*0.587+b*0.114)>150?'#F7F5F3':'#1B1917';}
+function swatch(c,fn,sel){return '<div class="color-opt'+(sel&&c.toLowerCase()===sel.toLowerCase()?' on':'')+'" style="background:'+c+'" onclick="'+fn+'(\''+c+'\')" title="'+c+'"></div>';}
 function initBranding(){
   const cur=S.merchant.brand_color||'#993C1D';
   S.logoUrl=S.merchant.logo_url||'';
+  S.bgColor=S.merchant.bg_color||'';
   $('set-color').value=cur;
-  $('brand-presets').innerHTML=BRAND_PRESETS.map(c=>'<div class="color-opt'+(c.toLowerCase()===cur.toLowerCase()?' on':'')+'" style="background:'+c+'" onclick="onBrandColor(\''+c+'\')" title="'+c+'"></div>').join('');
+  $('set-bg').value=S.bgColor||autoBg(cur);
+  $('brand-presets').innerHTML=BRAND_PRESETS.map(c=>swatch(c,'onBrandColor',cur)).join('');
+  $('bg-presets').innerHTML=BG_PRESETS.map(c=>swatch(c,'onBgColor',S.bgColor)).join('');
   const lp=$('logo-preview');
   if(S.logoUrl){lp.src=S.logoUrl;lp.style.display='inline-block';}else{lp.style.display='none';}
-  renderBrandPreview(cur);
+  renderPreview();
 }
 function rgbToHex(s){const m=String(s).match(/\d+/g);if(!m)return s;return '#'+m.slice(0,3).map(x=>(+x).toString(16).padStart(2,'0')).join('');}
 function textOn(hex){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return (r*0.299+g*0.587+b*0.114)>150?'#1A1A1A':'#FFFFFF';}
-function onBrandColor(hex){
-  $('set-color').value=hex;
-  document.querySelectorAll('#brand-presets .color-opt').forEach(c=>c.classList.toggle('on',rgbToHex(c.style.background).toLowerCase()===hex.toLowerCase()));
-  renderBrandPreview(hex);
-}
-function renderBrandPreview(hex){
-  const pv=$('brand-preview');pv.style.background=hex;pv.style.color=textOn(hex);
+function markOn(sel,hex){document.querySelectorAll(sel+' .color-opt').forEach(c=>c.classList.toggle('on',rgbToHex(c.style.background).toLowerCase()===(hex||'').toLowerCase()));}
+function onBrandColor(hex){$('set-color').value=hex;markOn('#brand-presets',hex);if(!S.bgColor)$('set-bg').value=autoBg(hex);renderPreview();}
+function onBgColor(hex){S.bgColor=hex;$('set-bg').value=hex;markOn('#bg-presets',hex);renderPreview();}
+function resetBg(){S.bgColor='';$('set-bg').value=autoBg($('set-color').value);markOn('#bg-presets','');renderPreview();}
+function renderPreview(){
+  const card=$('set-color').value,bg=S.bgColor||autoBg(card);
+  const bp=$('bg-preview');if(bp)bp.style.background=bg;
+  const pv=$('brand-preview');pv.style.background=card;pv.style.color=textOn(card);
   const goal=S.merchant.stamps_per_card||10;
   $('prev-logo').textContent=(S.merchant.logo_text||S.merchant.name||'YOUR BRAND').toUpperCase();
   $('prev-reward').textContent='集满 '+goal+' 个印章换 '+(S.merchant.reward_name||'免费奖励');
@@ -781,9 +796,9 @@ function onLogoFile(e){
 }
 async function saveBranding(){
   const color=$('set-color').value,pin=$('set-pin').value.trim();
-  const res=await fetch(API+'/api/merchant/'+S.merchant.slug+'/branding',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({brand_color:color,logo_url:S.logoUrl||null})});
+  const res=await fetch(API+'/api/merchant/'+S.merchant.slug+'/branding',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({brand_color:color,logo_url:S.logoUrl||null,bg_color:S.bgColor||null})});
   if(!res.ok){toast('保存失败');return;}
-  S.merchant.brand_color=color;
+  S.merchant.brand_color=color;S.merchant.bg_color=S.bgColor||null;
   if(pin){const staffRes=await fetch(API+'/api/staff/'+S.merchant.id).then(r=>r.json());if(staffRes[0])await fetch(API+'/api/staff/'+staffRes[0].id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin})});}
   toast('品牌设置已保存！');
 }

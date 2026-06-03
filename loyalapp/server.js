@@ -52,7 +52,7 @@ app.get('/api/vapid-key', (req, res) => {
 // ── MERCHANT PUBLIC INFO ──────────────────────────────────────
 app.get('/api/merchant/:slug', async (req, res) => {
   const { data, error } = await db.from('merchants')
-    .select('id,name,slug,brand_color,logo_text,logo_url,stamps_per_card,reward_name,reward_value,services')
+    .select('id,name,slug,brand_color,bg_color,logo_text,logo_url,stamps_per_card,reward_name,reward_value,services')
     .eq('slug', req.params.slug)
     .maybeSingle();
   if (!data) return res.status(404).json({ error: 'Merchant not found' });
@@ -98,10 +98,11 @@ app.patch('/api/merchant/:id', async (req, res) => {
 
 // ── UPDATE BRANDING (color + logo_url) by slug ────────────────
 app.put('/api/merchant/:slug/branding', async (req, res) => {
-  const { brand_color, logo_url } = req.body;
+  const { brand_color, logo_url, bg_color } = req.body;
   const patch = {};
   if (brand_color !== undefined) patch.brand_color = brand_color;
   if (logo_url !== undefined) patch.logo_url = logo_url;
+  if (bg_color !== undefined) patch.bg_color = bg_color;
   if (!Object.keys(patch).length) return res.status(400).json({ error: 'nothing to update' });
   const { error } = await db.from('merchants').update(patch).eq('slug', req.params.slug);
   if (error) return res.status(400).json({ error: error.message });

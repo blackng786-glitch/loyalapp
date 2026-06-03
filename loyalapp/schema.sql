@@ -10,7 +10,9 @@ create table public.merchants (
   name           text not null,                      -- "Neue Car Spa"
   slug           text not null unique,               -- "neue-car-spa"
   email          text not null unique,
-  brand_color    text not null default '#C9A84C',    -- hex color
+  brand_color    text not null default '#993C1D',    -- hex color (card fill)
+  bg_color       text,                               -- 顾客卡页面背景色 (可空=自动)
+  logo_url       text,                               -- 商家 logo (Supabase Storage URL)
   logo_text      text not null default 'LOYAL',      -- short brand name on card
   stamps_per_card integer not null default 10,
   reward_name    text not null default 'Free Item',
