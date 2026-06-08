@@ -269,7 +269,7 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
     <div class="nav-brand" id="mem-brand">LOYAL</div>
     <div style="display:flex;gap:8px;align-items:center">
       <button class="nav-btn" id="mem-install-btn" style="display:none" onclick="doInstall()"><i class="ti ti-device-mobile-down" aria-hidden="true"></i> Install</button>
-      <button class="nav-btn" onclick="show('landing')"><i class="ti ti-logout" aria-hidden="true"></i></button>
+      <button class="nav-btn" onclick="logout()"><i class="ti ti-logout" aria-hidden="true"></i></button>
     </div>
   </nav>
   <div class="m-card fade">
@@ -348,7 +348,7 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
 const API='';
 const SUPA_URL='https://hrwoejdyjxpohdvfzcga.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhyd29lamR5anhwb2hkdmZ6Y2dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0Mjg0ODIsImV4cCI6MjA5NTAwNDQ4Mn0.YqfXjNFenVEp7Cu1zzMHagOqJOXtpLqMRX3z2Y3DwP4';
-const S={merchant:null,member:null,stamps:[],redemptions:[],pendingRedeem:null};
+const S={merchant:null,member:null,stamps:[],redemptions:[],pendingRedeem:null,slug:null};
 let deferredInstall=null;
 const {createClient}=supabase;
 const db=createClient(SUPA_URL,SUPA_KEY);
@@ -377,10 +377,20 @@ async function init(){
   const res=await fetch(API+'/api/merchant/'+slug);
   if(!res.ok){show('error');return;}
   S.merchant=await res.json();
+  S.slug=slug;
   applyBranding(S.merchant);
   document.getElementById('pwa-manifest').href='/manifest/'+slug+'.json';
   setupInstall();
   if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  // 自动登录: 读取本地保存的会员
+  const saved=localStorage.getItem('chopkar_'+slug+'_member');
+  if(saved){
+    try{
+      S.member=JSON.parse(saved);S.stamps=[];S.redemptions=[];
+      try{const ar=await fetch(API+'/api/member/'+S.member.id+'/activity');const ad=await ar.json();S.stamps=ad.stamps||[];S.redemptions=ad.redemptions||[];}catch(e){}
+      renderMemberView();show('member');return;
+    }catch(e){}
+  }
   show('landing');
 }
 
@@ -438,6 +448,8 @@ function applyBranding(m){
 }
 
 function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));$('v-'+id).classList.add('on');}
+function persistMember(m){try{localStorage.setItem('chopkar_'+S.slug+'_memberId',m.id);localStorage.setItem('chopkar_'+S.slug+'_member',JSON.stringify(m));}catch(e){}}
+function logout(){try{localStorage.removeItem('chopkar_'+S.slug+'_memberId');localStorage.removeItem('chopkar_'+S.slug+'_member');}catch(e){}S.member=null;show('landing');}
 
 document.addEventListener('DOMContentLoaded',()=>{
   const ph=document.getElementById('ph-in');
@@ -455,7 +467,7 @@ async function findMember(){
     if(!data){toast('Not found - please register');goReg();return;}
     S.member=data;S.stamps=[];S.redemptions=[];
     try{const ar=await fetch(API+'/api/member/'+data.id+'/activity');const ad=await ar.json();S.stamps=ad.stamps||[];S.redemptions=ad.redemptions||[];}catch(e2){}
-    renderMemberView();show('member');
+    persistMember(S.member);renderMemberView();show('member');
   }catch(e){toast('Connection error: '+e.message);}
   finally{btn.disabled=false;btn.innerHTML='<i class="ti ti-arrow-right"></i> Find My Card';}
 }
@@ -476,7 +488,7 @@ async function doRegister(){
     const data=await res.json();
     if(!res.ok){toast(data.error||'Error');return;}
     S.member=data;S.stamps=[];S.redemptions=[];
-    renderMemberView();show('member');toast('Welcome, '+name.split(' ')[0]+'!');
+    persistMember(S.member);renderMemberView();show('member');toast('Welcome, '+name.split(' ')[0]+'!');
   }catch(e){toast('Connection error');}
   finally{btn.disabled=false;btn.innerHTML='<i class="ti ti-check"></i> Create My Card';}
 }

@@ -51,17 +51,21 @@ app.get('/api/vapid-key', (req, res) => {
 
 // ── MERCHANT PUBLIC INFO ──────────────────────────────────────
 app.get('/api/merchant/:slug', async (req, res) => {
-  const full = 'id,name,slug,brand_color,bg_color,logo_text,logo_url,stamps_per_card,reward_name,reward_value,services';
-  const safe = 'id,name,slug,brand_color,logo_text,logo_url,stamps_per_card,reward_name,reward_value,services';
-  let { data } = await db.from('merchants').select(full).eq('slug', req.params.slug).maybeSingle();
-  if (!data) {   // 兼容: bg_color 列可能尚未建(migration-v4 未跑), 去掉后重试
-    const r = await db.from('merchants').select(safe).eq('slug', req.params.slug).maybeSingle();
-    data = r.data;
-  }
+  // select('*') 对缺失列容错(bg_color/feature_* 迁移可能未跑), 输出仅白名单字段(不泄露 email/auth_id)
+  const { data } = await db.from('merchants').select('*').eq('slug', req.params.slug).maybeSingle();
   if (!data) return res.status(404).json({ error: 'Merchant not found' });
-  // 兼容别名: stamp_goal / reward_text
-  res.json({ ...data, stamp_goal: data.stamps_per_card,
-    reward_text: data.reward_value ? `${data.reward_name} (${data.reward_value})` : data.reward_name });
+  res.json({
+    id: data.id, name: data.name, slug: data.slug,
+    brand_color: data.brand_color, bg_color: data.bg_color || null,
+    logo_text: data.logo_text, logo_url: data.logo_url || null,
+    stamps_per_card: data.stamps_per_card, reward_name: data.reward_name, reward_value: data.reward_value,
+    services: data.services,
+    feature_stamp: data.feature_stamp !== false,      // 默认开
+    feature_bottle: !!data.feature_bottle,            // 默认关
+    feature_voucher: !!data.feature_voucher,          // 默认关
+    stamp_goal: data.stamps_per_card,
+    reward_text: data.reward_value ? `${data.reward_name} (${data.reward_value})` : data.reward_name,
+  });
 });
 
 // ── MERCHANT BY AUTH ID ───────────────────────────────────────
@@ -530,10 +534,122 @@ app.get('/api/analytics/:merchantId', async (req, res) => {
   });
 });
 
+// ── FEATURE TOGGLES (印章/存酒/储值券) ─────────────────────────
+app.put('/api/merchant/:slug/features', async (req, res) => {
+  const { feature_stamp, feature_bottle, feature_voucher } = req.body;
+  const patch = {};
+  if (feature_stamp !== undefined) patch.feature_stamp = !!feature_stamp;
+  if (feature_bottle !== undefined) patch.feature_bottle = !!feature_bottle;
+  if (feature_voucher !== undefined) patch.feature_voucher = !!feature_voucher;
+  if (!Object.keys(patch).length) return res.status(400).json({ error: 'nothing to update' });
+  const { error } = await db.from('merchants').update(patch).eq('slug', req.params.slug);
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// ── BOTTLE KEEP (存酒) ─────────────────────────────────────────
+app.get('/api/bottles', async (req, res) => {
+  const { memberId, merchantId } = req.query;
+  const { data } = await db.from('bottle_keeps')
+    .select('id,brand,size_ml,remaining_ml,photo_url,expires_at,created_at')
+    .eq('member_id', memberId).eq('merchant_id', merchantId).gt('remaining_ml', 0)
+    .order('created_at', { ascending: false });
+  res.json(data || []);
+});
+
+app.post('/api/bottles', async (req, res) => {
+  const { memberId, merchantId, brand, size_ml, photo_url, expires_at } = req.body;
+  if (!memberId || !merchantId || !brand || !size_ml) return res.status(400).json({ error: 'memberId, merchantId, brand, size_ml required' });
+  const size = parseInt(size_ml);
+  const { data, error } = await db.from('bottle_keeps').insert({
+    member_id: memberId, merchant_id: merchantId, brand, size_ml: size, remaining_ml: size,
+    photo_url: photo_url || null, expires_at: expires_at || null,
+  }).select().single();
+  if (error) return res.status(400).json({ error: error.message });
+  await db.from('bottle_transactions').insert({ bottle_keep_id: data.id, type: 'deposit', amount_ml: size, note: '登记存酒' });
+  res.json({ success: true, bottle: data });
+});
+
+app.post('/api/bottles/:id/pour', async (req, res) => {
+  const { amount_ml, note, staffId } = req.body;
+  const amt = parseInt(amount_ml);
+  if (!amt || amt <= 0) return res.status(400).json({ error: 'amount_ml 无效' });
+  const { data: b } = await db.from('bottle_keeps').select('remaining_ml').eq('id', req.params.id).maybeSingle();
+  if (!b) return res.status(404).json({ error: '存酒不存在' });
+  if (b.remaining_ml < amt) return res.status(400).json({ error: '剩余酒量不足' });
+  const remaining = b.remaining_ml - amt;
+  const { error } = await db.from('bottle_keeps').update({ remaining_ml: remaining }).eq('id', req.params.id);
+  if (error) return res.status(400).json({ error: error.message });
+  await db.from('bottle_transactions').insert({ bottle_keep_id: req.params.id, type: 'pour', amount_ml: amt, note: note || null, staff_id: staffId || null });
+  res.json({ success: true, remaining_ml: remaining });
+});
+
+app.get('/api/bottles/all', async (req, res) => {
+  const { merchantId } = req.query;
+  if (!merchantId) return res.status(400).json({ error: 'merchantId required' });
+  const { data } = await db.from('bottle_keeps').select('*,members(name,phone)')
+    .eq('merchant_id', merchantId)
+    .order('expires_at', { ascending: true, nullsFirst: false });
+  const bottles = (data || []).map(b => ({ ...b, member_name: b.members?.name || '', member_phone: b.members?.phone || '', members: undefined }));
+  res.json({ bottles });
+});
+
+app.get('/api/bottles/:id/transactions', async (req, res) => {
+  const { data } = await db.from('bottle_transactions').select('*')
+    .eq('bottle_keep_id', req.params.id).order('created_at', { ascending: false }).limit(20);
+  res.json(data || []);
+});
+
+// ── VOUCHERS (储值券) ──────────────────────────────────────────
+app.get('/api/vouchers', async (req, res) => {
+  const { memberId, merchantId } = req.query;
+  const { data } = await db.from('vouchers').select('id,type,label,total,remaining,expires_at')
+    .eq('member_id', memberId).eq('merchant_id', merchantId).gt('remaining', 0)
+    .order('created_at', { ascending: false });
+  res.json(data || []);
+});
+
+app.post('/api/vouchers', async (req, res) => {
+  const { memberId, merchantId, type, label, total, expires_at } = req.body;
+  if (!memberId || !merchantId || total == null) return res.status(400).json({ error: 'memberId, merchantId, total required' });
+  const tot = Number(total);
+  const { data, error } = await db.from('vouchers').insert({
+    member_id: memberId, merchant_id: merchantId, type: type || 'session', label: label || null,
+    total: tot, remaining: tot, expires_at: expires_at || null,
+  }).select().single();
+  if (error) return res.status(400).json({ error: error.message });
+  await db.from('voucher_transactions').insert({ voucher_id: data.id, type: 'issue', amount: tot, note: '发券' });
+  res.json({ success: true, voucher: data });
+});
+
+app.post('/api/vouchers/:id/redeem', async (req, res) => {
+  const { amount, note, staffId } = req.body;
+  const amt = Number(amount);
+  if (!amt || amt <= 0) return res.status(400).json({ error: 'amount 无效' });
+  const { data: v } = await db.from('vouchers').select('remaining').eq('id', req.params.id).maybeSingle();
+  if (!v) return res.status(404).json({ error: '券不存在' });
+  if (v.remaining < amt) return res.status(400).json({ error: '余额不足' });
+  const remaining = v.remaining - amt;
+  const { error } = await db.from('vouchers').update({ remaining }).eq('id', req.params.id);
+  if (error) return res.status(400).json({ error: error.message });
+  await db.from('voucher_transactions').insert({ voucher_id: req.params.id, type: 'redeem', amount: amt, note: note || null, staff_id: staffId || null });
+  res.json({ success: true, remaining });
+});
+
+app.get('/api/vouchers/all', async (req, res) => {
+  const { merchantId } = req.query;
+  if (!merchantId) return res.status(400).json({ error: 'merchantId required' });
+  const { data } = await db.from('vouchers').select('*,members(name,phone)')
+    .eq('merchant_id', merchantId).gt('remaining', 0).order('created_at', { ascending: false });
+  const vouchers = (data || []).map(v => ({ ...v, member_name: v.members?.name || '', member_phone: v.members?.phone || '', members: undefined }));
+  res.json({ vouchers });
+});
+
 // ── FALLBACK: serve card.html for PWA routes ──────────────────
 app.get('/card', (req, res) => res.sendFile('card.html', { root: 'public' }));
 app.get('/staff', (req, res) => res.sendFile('staff.html', { root: 'public' }));
 app.get('/dashboard', (req, res) => res.sendFile('dashboard.html', { root: 'public' }));
+app.get('/bottle', (req, res) => res.sendFile('bottle.html', { root: 'public' }));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`LoyalApp running on port ${PORT}`));

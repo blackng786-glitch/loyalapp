@@ -167,6 +167,16 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
 .st-cancelled,.st-failed{background:rgba(224,91,91,0.12);color:#E05B5B}
 .sched-cancel{background:none;border:1px solid var(--b2);border-radius:6px;color:var(--t3);font-size:11px;padding:4px 10px;cursor:pointer;flex-shrink:0}
 .sched-cancel:hover{border-color:#E05B5B;color:#E05B5B}
+.feat-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--b1)}
+.feat-row:last-of-type{border-bottom:none}
+.feat-row b{font-size:14px}
+.feat-row small{display:block;color:var(--t3);font-size:11px;margin-top:2px}
+.feat-row input[type=checkbox]{width:22px;height:22px;accent-color:var(--gold);cursor:pointer;flex-shrink:0}
+.cl-badge{font-size:10px;letter-spacing:.5px;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.cl-ok{background:rgba(74,158,106,0.15);color:var(--green)}
+.cl-warn{background:rgba(239,159,39,0.15);color:#EF9F27}
+.cl-exp{background:rgba(224,75,74,0.15);color:#E24B4A}
+.cl-empty{background:var(--s3);color:var(--t3)}
 </style>
 </head>
 <body>
@@ -407,6 +417,34 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
       <div class="branch-chips" id="branch-chips"></div>
     </div>
 
+    <!-- 酒窖 CELLAR (feature_bottle) -->
+    <div class="card" id="cellar-card" style="display:none">
+      <div class="card-title"><i class="ti ti-bottle" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>酒窖 Bottle Keep</div>
+      <div class="card-sub">会员存酒管理与过期预警（按到期日排序）</div>
+      <div class="stats-grid" style="margin-bottom:16px">
+        <div class="stat"><div class="stat-lbl">存酒总瓶数</div><div class="stat-val" id="cl-active">-</div></div>
+        <div class="stat"><div class="stat-lbl">本周到期</div><div class="stat-val" id="cl-expiring">-</div><div class="stat-sub">≤7 天</div></div>
+        <div class="stat"><div class="stat-lbl">已清空</div><div class="stat-val" id="cl-empty">-</div></div>
+      </div>
+      <div class="members-toolbar"><input class="members-search" id="cl-search" type="text" placeholder="搜索会员 / 品牌 / 手机..." oninput="renderCellar()"></div>
+      <div style="overflow-x:auto">
+        <table class="member-table">
+          <thead><tr><th>会员</th><th>品牌</th><th>剩余</th><th>进度</th><th>到期</th><th>状态</th></tr></thead>
+          <tbody id="cellar-tbody"><tr><td colspan="6" class="empty-sm">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 功能开关 FEATURES -->
+    <div class="card">
+      <div class="card-title"><i class="ti ti-toggle-right" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>功能开关 Features</div>
+      <div class="card-sub">开启 / 关闭本店的功能模块</div>
+      <label class="feat-row"><span><b>印章卡</b><small>集印章换奖励</small></span><input type="checkbox" id="ft-stamp"></label>
+      <label class="feat-row"><span><b>存酒 Bottle Keep</b><small>酒吧存酒 / 扣量</small></span><input type="checkbox" id="ft-bottle"></label>
+      <label class="feat-row"><span><b>储值券</b><small>次卡 / 储值卡</small></span><input type="checkbox" id="ft-voucher"></label>
+      <button class="btn btn-gold btn-sm" type="button" style="width:auto;margin-top:10px" onclick="saveFeatures()"><i class="ti ti-check" aria-hidden="true"></i> 保存功能开关</button>
+    </div>
+
     <!-- BRANDING 品牌设置 -->
     <div class="card">
       <div class="card-title"><i class="ti ti-palette" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>Branding 品牌设置</div>
@@ -470,7 +508,7 @@ const SUPA_URL='https://hrwoejdyjxpohdvfzcga.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhyd29lamR5anhwb2hkdmZ6Y2dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0Mjg0ODIsImV4cCI6MjA5NTAwNDQ4Mn0.YqfXjNFenVEp7Cu1zzMHagOqJOXtpLqMRX3z2Y3DwP4';
 const {createClient}=supabase;
 const db=createClient(SUPA_URL,SUPA_KEY);
-const S={user:null,merchant:null,services:[],allMembers:[],filteredMembers:[],branches:[],anDays:30,pushMode:'now'};
+const S={user:null,merchant:null,services:[],allMembers:[],filteredMembers:[],branches:[],anDays:30,pushMode:'now',cellar:[]};
 let deferredInstall=null;
 const charts={};
 
@@ -564,6 +602,8 @@ async function showDashboard(){
   loadScheduled();
   loadAnalytics();
   initBranding();
+  initFeatures();
+  if(S.merchant.feature_bottle){$('cellar-card').style.display='';loadCellar();}else{$('cellar-card').style.display='none';}
 }
 
 async function loadStats(){
@@ -801,6 +841,60 @@ async function saveBranding(){
   S.merchant.brand_color=color;S.merchant.bg_color=S.bgColor||null;
   if(pin){const staffRes=await fetch(API+'/api/staff/'+S.merchant.id).then(r=>r.json());if(staffRes[0])await fetch(API+'/api/staff/'+staffRes[0].id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin})});}
   toast('品牌设置已保存！');
+}
+
+// ── FEATURES 功能开关 ──────────────────────────────
+function initFeatures(){
+  $('ft-stamp').checked=S.merchant.feature_stamp!==false;
+  $('ft-bottle').checked=!!S.merchant.feature_bottle;
+  $('ft-voucher').checked=!!S.merchant.feature_voucher;
+}
+async function saveFeatures(){
+  const body={feature_stamp:$('ft-stamp').checked,feature_bottle:$('ft-bottle').checked,feature_voucher:$('ft-voucher').checked};
+  const res=await fetch(API+'/api/merchant/'+S.merchant.slug+'/features',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!res.ok){toast('保存失败');return;}
+  Object.assign(S.merchant,body);
+  if(S.merchant.feature_bottle){$('cellar-card').style.display='';loadCellar();}else{$('cellar-card').style.display='none';}
+  toast('功能开关已保存！');
+}
+
+// ── 酒窖 CELLAR ──────────────────────────────
+async function loadCellar(){
+  const data=await fetch(API+'/api/bottles/all?merchantId='+S.merchant.id).then(r=>r.json()).catch(()=>({bottles:[]}));
+  S.cellar=data.bottles||[];
+  const active=S.cellar.filter(b=>b.remaining_ml>0).length;
+  const empty=S.cellar.filter(b=>b.remaining_ml<=0).length;
+  const now=Date.now();
+  const expiring=S.cellar.filter(b=>b.remaining_ml>0&&b.expires_at&&((new Date(b.expires_at)-now)/86400000)<=7).length;
+  $('cl-active').textContent=active;$('cl-expiring').textContent=expiring;$('cl-empty').textContent=empty;
+  renderCellar();
+}
+function renderCellar(){
+  const q=($('cl-search').value||'').toLowerCase().trim();
+  let list=S.cellar;
+  if(q)list=list.filter(b=>(b.member_name||'').toLowerCase().includes(q)||(b.brand||'').toLowerCase().includes(q)||(b.member_phone||'').includes(q));
+  const tb=$('cellar-tbody');
+  if(!list.length){tb.innerHTML='<tr><td colspan="6" class="empty-sm">无存酒</td></tr>';return;}
+  tb.innerHTML=list.map(b=>{
+    const pct=Math.max(0,Math.min(100,Math.round(b.remaining_ml/b.size_ml*100)));
+    const col=pct>50?'#D85A30':(pct>=20?'#EF9F27':'#E24B4A');
+    let badge='<span class="cl-badge cl-ok">正常</span>',exp='-';
+    if(b.remaining_ml<=0)badge='<span class="cl-badge cl-empty">已清空</span>';
+    if(b.expires_at){
+      exp=new Date(b.expires_at).toLocaleDateString('en-MY',{day:'numeric',month:'short',year:'numeric'});
+      if(b.remaining_ml>0){
+        const d=Math.ceil((new Date(b.expires_at)-Date.now())/86400000);
+        if(d<0)badge='<span class="cl-badge cl-exp">已过期</span>';
+        else if(d<=7)badge='<span class="cl-badge cl-warn">即将到期</span>';
+      }
+    }
+    return '<tr><td style="font-weight:500">'+esc(b.member_name||'-')+'<div style="font-size:11px;color:var(--t3);font-family:DM Mono,monospace">'+esc(b.member_phone||'')+'</div></td>'
+      +'<td>'+esc(b.brand)+'</td>'
+      +'<td style="font-family:DM Mono,monospace;color:var(--gold)">'+b.remaining_ml+'<span style="color:var(--t3)">/'+b.size_ml+'</span></td>'
+      +'<td style="min-width:80px"><div style="background:var(--s3);border-radius:20px;height:7px;overflow:hidden"><div style="height:7px;border-radius:20px;width:'+pct+'%;background:'+col+'"></div></div></td>'
+      +'<td style="font-size:12px;color:var(--t3)">'+exp+'</td>'
+      +'<td>'+badge+'</td></tr>';
+  }).join('');
 }
 
 function copyLink(id){navigator.clipboard.writeText($(id).textContent).then(()=>toast('Link copied!'));}

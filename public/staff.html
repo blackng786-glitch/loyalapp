@@ -153,6 +153,12 @@ canvas#scan-canvas{display:none}
 .badge{background:rgba(250,236,231,0.16);border-color:rgba(250,236,231,0.35);color:var(--ck-light)}
 .ck-footer{text-align:center;font-size:10px;color:var(--ck-muted);letter-spacing:1px;margin-top:22px}
 .ck-footer b{color:var(--ck-accent);font-weight:500}
+.box{background:var(--s1);border:1px solid var(--b2);border-radius:12px;padding:14px;margin-bottom:10px}
+.box-ttl{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin:6px 2px 10px}
+.chip{background:var(--s3);border:1px solid var(--b3);border-radius:20px;color:var(--t2);font-size:12px;padding:6px 12px;cursor:pointer}
+.chip:hover{border-color:var(--brand);color:var(--brand)}
+.toast.ok{border-color:#1D9E75;color:#1D9E75}
+.toast.err{border-color:#E24B4A;color:#E24B4A}
 </style>
 </head>
 <body>
@@ -194,6 +200,7 @@ canvas#scan-canvas{display:none}
   <div class="tabs" id="staff-tabs">
     <button class="tab on" onclick="sTab(0,'search')">Members</button>
     <button class="tab" onclick="sTab(1,'dashboard')">Dashboard</button>
+    <button class="tab" id="tab-bottle" style="display:none" onclick="sTab(2,'bottle')">存酒</button>
   </div>
 
   <div class="pane on" id="tp-search">
@@ -226,6 +233,16 @@ canvas#scan-canvas{display:none}
     <div class="act-box" id="d-activity">
       <div class="loader"><i class="ti ti-loader-2" aria-hidden="true"></i></div>
     </div>
+  </div>
+
+  <div class="pane" id="tp-bottle">
+    <div class="search-wrap">
+      <div class="search-box">
+        <i class="ti ti-search ico" aria-hidden="true"></i>
+        <input class="search-input" id="b-search" type="text" placeholder="搜索会员姓名或手机..." oninput="bSearch(this.value)" autocomplete="off">
+      </div>
+    </div>
+    <div class="results" id="b-results"></div>
   </div>
 </div>
 
@@ -264,7 +281,7 @@ canvas#scan-canvas{display:none}
 
 <script>
 const API='';
-const S={merchant:null,staff:null,pin:'',allMembers:[],filteredMembers:[]};
+const S={merchant:null,staff:null,pin:'',allMembers:[],filteredMembers:[],bMember:null};
 let pendingMemberId='',pendingMemberName='';
 let scanStream=null,scanTimer=null,scanActive=false;
 let deferredInstall=null;
@@ -321,6 +338,7 @@ async function checkPin(){
   loadStaffBranches();
   loadAllMembers();
   loadDashboard();
+  if(S.merchant.feature_bottle){$('tab-bottle').style.display='';bSearch('');}
   toast('Welcome, '+S.staff.name+'!');
 }
 
@@ -329,7 +347,7 @@ function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.remo
 
 function sTab(idx,id){
   document.querySelectorAll('#staff-tabs .tab').forEach((t,i)=>t.classList.toggle('on',i===idx));
-  ['search','dashboard'].forEach(n=>{const el=$('tp-'+n);if(el)el.classList.toggle('on',n===id);});
+  ['search','dashboard','bottle'].forEach(n=>{const el=$('tp-'+n);if(el)el.classList.toggle('on',n===id);});
   if(id==='dashboard')loadDashboard();
 }
 
@@ -470,7 +488,91 @@ function $(id){return document.getElementById(id);}
 function mk(t){return document.createElement(t);}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function fmtTime(s){const d=new Date(s),t=new Date();return d.toDateString()===t.toDateString()?d.toLocaleTimeString('en-MY',{hour:'2-digit',minute:'2-digit'}):d.toLocaleDateString('en-MY',{day:'numeric',month:'short'});}
-let _tt;function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('on');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('on'),2500);}
+let _tt;function toast(msg,type){const el=$('toast');el.textContent=msg;el.className='toast on'+(type?' '+type:'');clearTimeout(_tt);_tt=setTimeout(()=>el.className='toast',2800);}
+
+// ── BOTTLE KEEP / VOUCHER (staff) ──────────────────────────────
+function initials(n){return String(n||'').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();}
+function bSearch(q){
+  const res=$('b-results');S.bMember=null;
+  if(!q||!q.trim()){res.innerHTML='<div class="empty"><i class="ti ti-bottle" aria-hidden="true"></i><p>搜索会员开始登记存酒 / 扣量</p></div>';return;}
+  const lq=q.toLowerCase();
+  const list=(S.allMembers||[]).filter(m=>m.name.toLowerCase().includes(lq)||m.phone.includes(q)).slice(0,8);
+  if(!list.length){res.innerHTML='<div class="empty"><i class="ti ti-user-off" aria-hidden="true"></i><p>无匹配会员</p></div>';return;}
+  res.innerHTML=list.map(m=>'<div class="mr" style="cursor:pointer" onclick="bSelect(\''+m.id+'\')"><div class="mr-top"><div class="avatar">'+esc(initials(m.name))+'</div><div class="mr-info"><div class="mr-name">'+esc(m.name)+'</div><div class="mr-meta">'+esc(m.phone)+'</div></div><i class="ti ti-chevron-right" style="color:var(--t3)" aria-hidden="true"></i></div></div>').join('');
+}
+function bClear(){S.bMember=null;$('b-search').value='';bSearch('');}
+function bSelect(id){S.bMember=(S.allMembers||[]).find(m=>m.id===id);if(!S.bMember)return;$('b-search').value=S.bMember.name;renderBottleMember();}
+async function renderBottleMember(){
+  const m=S.bMember,res=$('b-results');if(!m)return;
+  res.innerHTML='<div class="loader"><i class="ti ti-loader-2" aria-hidden="true"></i></div>';
+  const q='memberId='+m.id+'&merchantId='+S.merchant.id;
+  const [bottles,vouchers]=await Promise.all([
+    fetch(API+'/api/bottles?'+q).then(r=>r.json()).catch(()=>[]),
+    S.merchant.feature_voucher?fetch(API+'/api/vouchers?'+q).then(r=>r.json()).catch(()=>[]):Promise.resolve([])
+  ]);
+  let h='<div class="mr"><div class="mr-top"><div class="avatar">'+esc(initials(m.name))+'</div><div class="mr-info"><div class="mr-name">'+esc(m.name)+'</div><div class="mr-meta">'+esc(m.phone)+'</div></div><button class="chip" onclick="bClear()">× 换人</button></div></div>';
+  h+='<div class="box"><div class="box-ttl">登记新存酒</div>'
+    +'<input class="search-input" id="dep-brand" placeholder="品牌 如 Hennessy XO" style="margin-bottom:8px">'
+    +'<input class="search-input" id="dep-size" type="number" inputmode="numeric" placeholder="容量 ml" style="margin-bottom:6px">'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+[375,700,750,1000,1750].map(s=>'<button class="chip" onclick="document.getElementById(\'dep-size\').value='+s+'">'+s+'</button>').join('')+'</div>'
+    +'<input class="search-input" id="dep-exp" type="date" style="margin-bottom:10px">'
+    +'<button class="btn btn-brand" onclick="bDeposit()"><i class="ti ti-plus" aria-hidden="true"></i> 登记存酒</button></div>';
+  h+='<div class="box-ttl">该会员存酒</div>';
+  h+=bottles.length?bottles.map(bottleCard).join(''):'<div class="empty" style="padding:18px"><p>暂无存酒</p></div>';
+  if(S.merchant.feature_voucher){
+    h+='<div class="box"><div class="box-ttl">发储值券</div>'
+      +'<select class="search-input" id="vc-type" style="margin-bottom:8px"><option value="session">次卡(按次)</option><option value="credit">储值(按金额)</option></select>'
+      +'<input class="search-input" id="vc-label" placeholder="标签 如 10次套餐" style="margin-bottom:8px">'
+      +'<input class="search-input" id="vc-total" type="number" inputmode="numeric" placeholder="总次数 / 金额" style="margin-bottom:10px">'
+      +'<button class="btn btn-outline" onclick="bIssueVoucher()"><i class="ti ti-ticket" aria-hidden="true"></i> 发券</button></div>';
+    h+='<div class="box-ttl">该会员券</div>';
+    h+=vouchers.length?vouchers.map(voucherCard).join(''):'<div class="empty" style="padding:18px"><p>暂无券</p></div>';
+  }
+  res.innerHTML=h;
+}
+function bottleCard(b){
+  const pct=Math.max(0,Math.min(100,Math.round(b.remaining_ml/b.size_ml*100)));
+  const col=pct>50?'#D85A30':(pct>=20?'#EF9F27':'#E24B4A');
+  return '<div class="box"><div style="display:flex;justify-content:space-between;align-items:center"><b>'+esc(b.brand)+'</b><span style="font-family:DM Mono,monospace;font-size:12px;color:var(--t2)">'+b.remaining_ml+'/'+b.size_ml+'ml</span></div>'
+    +'<div style="background:var(--s3);border-radius:20px;height:8px;margin:8px 0;overflow:hidden"><div style="height:8px;border-radius:20px;width:'+pct+'%;background:'+col+'"></div></div>'
+    +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><button class="chip" onclick="setPour(\''+b.id+'\',30)">+1杯</button><button class="chip" onclick="setPour(\''+b.id+'\',60)">+2杯</button>'
+    +'<input class="search-input" id="pour-'+b.id+'" type="number" inputmode="numeric" placeholder="ml" style="flex:1;min-width:64px;padding:9px 10px">'
+    +'<button class="btn btn-brand" style="width:auto;padding:9px 14px" onclick="bPour(\''+b.id+'\')">扣量</button></div></div>';
+}
+function setPour(id,ml){const el=$('pour-'+id);el.value=(parseInt(el.value)||0)+ml;}
+async function bPour(id){
+  const el=$('pour-'+id);const amt=parseInt(el.value);
+  if(!amt||amt<=0){toast('请输入扣量','err');return;}
+  const res=await fetch(API+'/api/bottles/'+id+'/pour',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount_ml:amt,staffId:S.staff.id})});
+  const data=await res.json();if(!res.ok){toast(data.error||'扣量失败','err');return;}
+  toast('已扣 '+amt+'ml','ok');renderBottleMember();
+}
+async function bDeposit(){
+  const brand=$('dep-brand').value.trim(),size=parseInt($('dep-size').value),exp=$('dep-exp').value;
+  if(!brand||!size){toast('请填品牌和容量','err');return;}
+  const res=await fetch(API+'/api/bottles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({memberId:S.bMember.id,merchantId:S.merchant.id,brand,size_ml:size,expires_at:exp||null})});
+  const data=await res.json();if(!res.ok){toast(data.error||'登记失败','err');return;}
+  toast('存酒已登记','ok');renderBottleMember();
+}
+function voucherCard(v){
+  const unit=v.type==='session'?'次':'';
+  return '<div class="box"><div style="display:flex;justify-content:space-between;align-items:center"><b>'+esc(v.label||(v.type==='session'?'次卡':'储值卡'))+'</b><span style="font-family:DM Mono,monospace;color:var(--brand)">剩 '+(+v.remaining)+unit+'</span></div>'
+    +'<div style="display:flex;gap:6px;margin-top:8px"><input class="search-input" id="rdm-'+v.id+'" type="number" inputmode="numeric" placeholder="'+(v.type==='session'?'次数':'金额')+'" style="flex:1;padding:9px 10px"><button class="btn btn-brand" style="width:auto;padding:9px 14px" onclick="bRedeem(\''+v.id+'\')">使用</button></div></div>';
+}
+async function bRedeem(id){
+  const el=$('rdm-'+id);const amt=Number(el.value);
+  if(!amt||amt<=0){toast('请输入使用量','err');return;}
+  const res=await fetch(API+'/api/vouchers/'+id+'/redeem',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:amt,staffId:S.staff.id})});
+  const data=await res.json();if(!res.ok){toast(data.error||'使用失败','err');return;}
+  toast('已使用','ok');renderBottleMember();
+}
+async function bIssueVoucher(){
+  const type=$('vc-type').value,label=$('vc-label').value.trim(),total=Number($('vc-total').value);
+  if(!total||total<=0){toast('请输入总量','err');return;}
+  const res=await fetch(API+'/api/vouchers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({memberId:S.bMember.id,merchantId:S.merchant.id,type,label,total})});
+  const data=await res.json();if(!res.ok){toast(data.error||'发券失败','err');return;}
+  toast('券已发放','ok');renderBottleMember();
+}
 
 init();
 </script>
