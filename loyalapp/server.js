@@ -145,6 +145,53 @@ app.post('/api/merchant/:slug/upload-logo', async (req, res) => {
   }
 });
 
+// ── CUSTOMER OTP AUTH (Supabase Phone OTP) ───────────────────
+app.post('/api/auth/send-otp', async (req, res) => {
+  const { phone } = req.body;
+  if (!phone || phone.length < 8) return res.status(400).json({ error: '请输入有效手机号' });
+  try {
+    const { error } = await db.auth.signInWithOtp({ phone });
+    if (error) return res.status(400).json({ error: error.message });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/auth/verify-otp', async (req, res) => {
+  const { phone, token, merchantId } = req.body;
+  if (!phone || !token) return res.status(400).json({ error: 'phone and token required' });
+  try {
+    const { error } = await db.auth.verifyOtp({ phone, token, type: 'sms' });
+    if (error) return res.status(400).json({ error: error.message });
+
+    // 查 members 表找这个 phone 的会员
+    let member = null, total_stamps = 0;
+    if (merchantId) {
+      // 精确匹配
+      const { data: m } = await db.from('members').select('*')
+        .eq('merchant_id', merchantId).eq('phone', phone).maybeSingle();
+      if (!m) {
+        // 模糊匹配: 去掉国际码最后9位
+        const tail = phone.replace(/\D/g, '').slice(-9);
+        const { data: rows } = await db.from('members').select('*')
+          .eq('merchant_id', merchantId).ilike('phone', '%' + tail).limit(1);
+        member = rows?.[0] || null;
+      } else {
+        member = m;
+      }
+      if (member) {
+        const { count } = await db.from('stamps')
+          .select('*', { count: 'exact', head: true }).eq('member_id', member.id);
+        total_stamps = count || 0;
+      }
+    }
+    res.json({ success: true, isNew: !member, member: member ? { ...member, total_stamps } : null });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── MEMBER LOOKUP ─────────────────────────────────────────────
 app.get('/api/member', async (req, res) => {
   const { phone, merchantId } = req.query;
