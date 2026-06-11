@@ -14,7 +14,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="/i18n.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -369,12 +368,17 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
 
 <script>
 const API='';
-const SUPA_URL='https://hrwoejdyjxpohdvfzcga.supabase.co';
-const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhyd29lamR5anhwb2hkdmZ6Y2dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0Mjg0ODIsImV4cCI6MjA5NTAwNDQ4Mn0.YqfXjNFenVEp7Cu1zzMHagOqJOXtpLqMRX3z2Y3DwP4';
-const S={merchant:null,member:null,stamps:[],redemptions:[],pendingRedeem:null,slug:null,otpPhone:''};
+const S={merchant:null,member:null,stamps:[],redemptions:[],pendingRedeem:null,slug:null,otpPhone:'',token:null,regTicket:null};
 let deferredInstall=null,cdTimer=null;
-const {createClient}=supabase;
-const db=createClient(SUPA_URL,SUPA_KEY);
+
+// 所有 /api/ 请求自动附带会员 token (后端鉴权)
+const _fetch=window.fetch.bind(window);
+window.fetch=(url,opts)=>{
+  if(typeof url==='string'&&url.startsWith('/api/')&&S.token){
+    opts=opts||{};opts.headers=Object.assign({},opts.headers||{},{'x-member-token':S.token});
+  }
+  return _fetch(url,opts);
+};
 
 const CC_HINTS={'+60':'Malaysia (+60) — enter number without leading 0','+65':'Singapore (+65) — enter 8-digit number','+62':'Indonesia (+62) — without leading 0','+66':'Thailand (+66) — without leading 0','+63':'Philippines (+63) — without leading 0','+44':'United Kingdom (+44) — without leading 0','+1':'USA/Canada (+1) — 10-digit number','other':'Enter full number including country code'};
 
@@ -394,10 +398,10 @@ function getPhone(ccId,phId){
   return cc+num;
 }
 
-// ── SESSION (30-day expiry) ─────────────────────────────────
+// ── SESSION (30-day expiry, 含服务端签发的登录 token) ─────────
 const SESSION_DAYS=30;
-function saveSession(member){
-  const session={memberId:member.id,phone:member.phone,name:member.name,expiresAt:Date.now()+SESSION_DAYS*86400000};
+function saveSession(member,token){
+  const session={memberId:member.id,phone:member.phone,name:member.name,token:token||S.token,expiresAt:Date.now()+SESSION_DAYS*86400000};
   try{
     localStorage.setItem('chopkar_'+S.slug+'_session',JSON.stringify(session));
     localStorage.setItem('chopkar_'+S.slug+'_memberId',member.id);
@@ -407,15 +411,10 @@ function saveSession(member){
 function getSession(){
   try{
     const raw=localStorage.getItem('chopkar_'+S.slug+'_session');
-    if(raw){
-      const s=JSON.parse(raw);
-      if(Date.now()<s.expiresAt) return s;
-      clearSession(); return null;          // expired
-    }
-    // 向后兼容: 旧格式没有 session key
-    const old=localStorage.getItem('chopkar_'+S.slug+'_member');
-    if(old) return {member:JSON.parse(old),valid:true};
-    return null;
+    if(!raw)return null;
+    const s=JSON.parse(raw);
+    if(!s.token||Date.now()>=s.expiresAt){clearSession();return null;}  // 旧格式无 token → 重新 OTP
+    return s;
   }catch(e){return null;}
 }
 function clearSession(){
@@ -435,23 +434,19 @@ async function init(){
   document.getElementById('pwa-manifest').href='/manifest/'+slug+'.json';
   setupInstall();
   if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
-  // 自动登录: 检查 session 是否有效
+  // 自动登录: session 有效且 token 未被服务端拒绝
   const sess=getSession();
-  if(sess){
-    const member=sess.member||null;
-    const memberId=sess.memberId||(member&&member.id);
-    if(memberId){
-      try{
-        if(member){S.member=member;}
-        else{
-          const mr=await fetch(API+'/api/member?phone='+encodeURIComponent(sess.phone)+'&merchantId='+S.merchant.id);
-          S.member=await mr.json();
-        }
-        S.stamps=[];S.redemptions=[];
-        try{const ar=await fetch(API+'/api/member/'+memberId+'/activity');const ad=await ar.json();S.stamps=ad.stamps||[];S.redemptions=ad.redemptions||[];}catch(e){}
-        renderMemberView();show('member');return;
-      }catch(e){}
-    }
+  if(sess&&sess.memberId){
+    try{
+      S.token=sess.token;
+      const saved=localStorage.getItem('chopkar_'+S.slug+'_member');
+      S.member=saved?JSON.parse(saved):{id:sess.memberId,name:sess.name,phone:sess.phone};
+      S.stamps=[];S.redemptions=[];
+      const ar=await fetch(API+'/api/member/'+sess.memberId+'/activity');
+      if(ar.status===401){S.token=null;clearSession();show('landing');return;}  // token 失效 → 重新登录
+      const ad=await ar.json();S.stamps=ad.stamps||[];S.redemptions=ad.redemptions||[];
+      renderMemberView();show('member');return;
+    }catch(e){}
   }
   show('landing');
 }
@@ -509,7 +504,7 @@ function applyBranding(m){
 }
 
 function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));$('v-'+id).classList.add('on');}
-function logout(){clearSession();S.member=null;show('landing');}
+function logout(){clearSession();S.member=null;S.token=null;show('landing');}
 
 // ── OTP FLOW ────────────────────────────────────────────────
 async function sendOtp(){
@@ -541,11 +536,12 @@ async function verifyOtp(){
     const data=await res.json();
     if(!res.ok){$('otp-err').textContent=data.error||'验证失败';btn.disabled=false;btn.innerHTML='<i class="ti ti-shield-check"></i> 验证';return;}
     if(data.isNew){
-      // 新会员: 需要输入姓名
+      // 新会员: 保存注册票据, 输入姓名
+      S.regTicket=data.regTicket;
       show('newname');$('nn-name').focus();return;
     }
-    // 老会员: 直接进入
-    await loginWithMember(data.member);
+    // 老会员: 用服务端签发的 token 登录
+    await loginWithMember(data.member,data.token);
   }catch(e){$('otp-err').textContent='网络错误';btn.disabled=false;btn.innerHTML='<i class="ti ti-shield-check"></i> 验证';}
 }
 
@@ -555,18 +551,19 @@ async function completeRegistration(){
   if(!name){$('nn-err').textContent='请输入姓名';return;}
   const btn=$('nn-btn');btn.disabled=true;btn.textContent='注册中...';
   try{
-    const res=await fetch(API+'/api/member',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,phone:S.otpPhone,merchantId:S.merchant.id})});
+    const res=await fetch(API+'/api/member',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,phone:S.otpPhone,merchantId:S.merchant.id,regTicket:S.regTicket})});
     const data=await res.json();
     if(!res.ok){$('nn-err').textContent=data.error||'注册失败';return;}
-    await loginWithMember(data);
+    await loginWithMember(data,data.token);
     toast('Welcome, '+name.split(' ')[0]+'!');
   }catch(e){$('nn-err').textContent='网络错误';}
   finally{btn.disabled=false;btn.innerHTML='<i class="ti ti-check"></i> 完成注册';}
 }
 
-async function loginWithMember(member){
+async function loginWithMember(member,token){
   S.member=member;S.stamps=[];S.redemptions=[];
-  saveSession(member);
+  S.token=token||S.token;
+  saveSession(member,S.token);
   try{const ar=await fetch(API+'/api/member/'+member.id+'/activity');const ad=await ar.json();S.stamps=ad.stamps||[];S.redemptions=ad.redemptions||[];}catch(e){}
   renderMemberView();show('member');
 }

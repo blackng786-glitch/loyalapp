@@ -2,15 +2,113 @@ require('dotenv').config();
 const express = require('express');
 const cors    = require('cors');
 const webpush = require('web-push');
+const crypto  = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
+app.set('trust proxy', 1);                 // Railway 反代后取真实客户端 IP (限流用)
 app.use(cors());
 app.use(express.json({ limit: '6mb' }));   // 6mb 以容纳 base64 logo 上传
 app.use(express.static('public'));
 
 // ── DB (service key for server-side operations) ──────────────
 const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+
+// ── AUTH HELPERS ─────────────────────────────────────────────
+// HMAC 签名 token (会员登录态 / 注册票据)。密钥优先用环境变量, 否则从 service key 派生。
+const TOKEN_SECRET = process.env.MEMBER_TOKEN_SECRET ||
+  crypto.createHash('sha256').update('chopkar-member:' + (process.env.SUPABASE_SERVICE_KEY || '')).digest('hex');
+
+const hmac = p => crypto.createHmac('sha256', TOKEN_SECRET).update(p).digest('base64url');
+function signToken(parts, ttlMs) {
+  const p64 = Buffer.from(JSON.stringify({ ...parts, exp: Date.now() + ttlMs })).toString('base64url');
+  return p64 + '.' + hmac(p64);
+}
+function verifyToken(token) {
+  try {
+    const [p64, sig] = String(token || '').split('.');
+    if (!p64 || !sig) return null;
+    const expect = hmac(p64);
+    if (sig.length !== expect.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expect))) return null;
+    const data = JSON.parse(Buffer.from(p64, 'base64url').toString());
+    return Date.now() > data.exp ? null : data;
+  } catch (e) { return null; }
+}
+const memberToken = (memberId, merchantId) => signToken({ t: 'member', memberId, merchantId }, 30 * 86400000); // 30 天
+const regTicketFor = (phone, merchantId) => signToken({ t: 'reg', phone, merchantId }, 15 * 60000);            // 15 分钟
+
+// 从请求头取已验证的会员身份 (x-member-token)
+function getMember(req) {
+  const d = verifyToken(req.headers['x-member-token']);
+  return d && d.t === 'member' ? d : null;
+}
+
+// Supabase JWT → user (dashboard 商家登录态)
+async function getAuthUser(req) {
+  const h = req.headers.authorization || '';
+  if (!h.startsWith('Bearer ')) return null;
+  try {
+    const { data, error } = await db.auth.getUser(h.slice(7));
+    return error ? null : data.user;
+  } catch (e) { return null; }
+}
+
+// 商家鉴权: JWT 用户必须拥有该 merchant。失败时已回复响应, 返回 null。
+async function requireMerchant(req, res, merchantId) {
+  const user = await getAuthUser(req);
+  if (!user) { res.status(401).json({ error: '请先登录' }); return null; }
+  if (!merchantId) { res.status(400).json({ error: 'merchantId required' }); return null; }
+  const { data: m } = await db.from('merchants').select('id,auth_id,slug').eq('id', merchantId).maybeSingle();
+  if (!m || m.auth_id !== user.id) { res.status(403).json({ error: '无权限' }); return null; }
+  return m;
+}
+async function requireMerchantBySlug(req, res, slug) {
+  const { data: m } = await db.from('merchants').select('id,auth_id,slug').eq('slug', slug).maybeSingle();
+  if (!m) { res.status(404).json({ error: 'Merchant not found' }); return null; }
+  const user = await getAuthUser(req);
+  if (!user || m.auth_id !== user.id) { res.status(401).json({ error: '未授权' }); return null; }
+  return m;
+}
+
+// 员工鉴权: x-staff-pin 头 (或 body.staffPin) + merchantId
+async function getStaff(req, merchantId) {
+  const pin = req.headers['x-staff-pin'] || req.body?.staffPin;
+  if (!pin || !merchantId) return null;
+  const { data } = await db.from('staff').select('*').eq('merchant_id', merchantId).eq('pin', pin).limit(1);
+  return data?.[0] || null;
+}
+
+// 员工或商家任一即可 (staff.html 与 dashboard.html 共用的端点)
+async function requireStaffOrMerchant(req, res, merchantId) {
+  if (!merchantId) { res.status(400).json({ error: 'merchantId required' }); return null; }
+  const staff = await getStaff(req, merchantId);
+  if (staff) return { staff };
+  const user = await getAuthUser(req);
+  if (user) {
+    const { data: m } = await db.from('merchants').select('id,auth_id').eq('id', merchantId).maybeSingle();
+    if (m && m.auth_id === user.id) return { merchant: m };
+  }
+  res.status(401).json({ error: '未授权' });
+  return null;
+}
+
+// ── RATE LIMIT (内存滑动窗口, 单实例部署够用) ──────────────────
+const rlMap = new Map();
+function rateOk(key, windowMs, max) {
+  const now = Date.now();
+  let arr = rlMap.get(key) || [];
+  arr = arr.filter(t => now - t < windowMs);
+  if (arr.length >= max) { rlMap.set(key, arr); return false; }
+  arr.push(now); rlMap.set(key, arr);
+  return true;
+}
+setInterval(() => {  // 每小时清理过期 key, 防内存增长
+  const now = Date.now();
+  for (const [k, arr] of rlMap) {
+    const live = arr.filter(t => now - t < 86400000);
+    if (live.length) rlMap.set(k, live); else rlMap.delete(k);
+  }
+}, 3600000);
 
 // ── WEB PUSH ─────────────────────────────────────────────────
 webpush.setVapidDetails(
@@ -70,6 +168,8 @@ app.get('/api/merchant/:slug', async (req, res) => {
 
 // ── MERCHANT BY AUTH ID ───────────────────────────────────────
 app.get('/api/merchant/by-auth/:authId', async (req, res) => {
+  const user = await getAuthUser(req);
+  if (!user || user.id !== req.params.authId) return res.status(401).json({ error: '未授权' });
   const { data } = await db.from('merchants')
     .select('*').eq('auth_id', req.params.authId).maybeSingle();
   res.json(data || null);
@@ -77,10 +177,13 @@ app.get('/api/merchant/by-auth/:authId', async (req, res) => {
 
 // ── CREATE MERCHANT ───────────────────────────────────────────
 app.post('/api/merchant', async (req, res) => {
-  const { name, slug, email, authId, brandColor, logoText, stampsPerCard, rewardName, rewardValue, services } = req.body;
+  const user = await getAuthUser(req);
+  if (!user) return res.status(401).json({ error: '请先登录' });
+  const { name, slug, email, brandColor, logoText, stampsPerCard, rewardName, rewardValue, services } = req.body;
   const { data, error } = await db.from('merchants').insert({
-    name, slug, email,
-    auth_id: authId,
+    name, slug,
+    email: user.email || email,
+    auth_id: user.id,                        // 取自 JWT, 不信任 body
     brand_color: brandColor || '#993C1D',
     logo_text: logoText || name.substring(0,6).toUpperCase(),
     stamps_per_card: stampsPerCard || 10,
@@ -97,14 +200,23 @@ app.post('/api/merchant', async (req, res) => {
 
 // ── UPDATE MERCHANT SETTINGS ──────────────────────────────────
 app.patch('/api/merchant/:id', async (req, res) => {
+  const m = await requireMerchant(req, res, req.params.id);
+  if (!m) return;
+  // 字段白名单, 防止改 auth_id / plan / email
+  const ALLOWED = ['name', 'brand_color', 'bg_color', 'logo_text', 'logo_url', 'stamps_per_card', 'reward_name', 'reward_value', 'services'];
+  const patch = {};
+  for (const k of ALLOWED) if (req.body[k] !== undefined) patch[k] = req.body[k];
+  if (!Object.keys(patch).length) return res.status(400).json({ error: 'nothing to update' });
   const { data, error } = await db.from('merchants')
-    .update(req.body).eq('id', req.params.id).select().single();
+    .update(patch).eq('id', req.params.id).select().single();
   if (error) return res.status(400).json({ error: error.message });
   res.json(data);
 });
 
 // ── UPDATE BRANDING (color + logo_url) by slug ────────────────
 app.put('/api/merchant/:slug/branding', async (req, res) => {
+  const m = await requireMerchantBySlug(req, res, req.params.slug);
+  if (!m) return;
   const { brand_color, logo_url, bg_color } = req.body;
   const patch = {};
   if (brand_color !== undefined) patch.brand_color = brand_color;
@@ -119,6 +231,8 @@ app.put('/api/merchant/:slug/branding', async (req, res) => {
 // ── UPLOAD LOGO (base64 → Supabase Storage 'logos' bucket) ────
 app.post('/api/merchant/:slug/upload-logo', async (req, res) => {
   try {
+    const owner = await requireMerchantBySlug(req, res, req.params.slug);
+    if (!owner) return;
     const { fileBase64 } = req.body;
     if (!fileBase64) return res.status(400).json({ error: 'fileBase64 required' });
     const m = fileBase64.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
@@ -149,6 +263,10 @@ app.post('/api/merchant/:slug/upload-logo', async (req, res) => {
 app.post('/api/auth/send-otp', async (req, res) => {
   const { phone } = req.body;
   if (!phone || phone.length < 8) return res.status(400).json({ error: '请输入有效手机号' });
+  // 限流: 防短信轰炸 + 控制 SMS 成本
+  if (!rateOk('otp:p1:' + phone, 60 * 1000, 1))        return res.status(429).json({ error: '发送太频繁，请 1 分钟后再试' });
+  if (!rateOk('otp:pd:' + phone, 24 * 3600 * 1000, 8)) return res.status(429).json({ error: '该号码今日发送次数已达上限' });
+  if (!rateOk('otp:ip:' + req.ip, 3600 * 1000, 15))    return res.status(429).json({ error: '请求过于频繁，请稍后再试' });
   try {
     const { error } = await db.auth.signInWithOtp({ phone });
     if (error) return res.status(400).json({ error: error.message });
@@ -161,6 +279,8 @@ app.post('/api/auth/send-otp', async (req, res) => {
 app.post('/api/auth/verify-otp', async (req, res) => {
   const { phone, token, merchantId } = req.body;
   if (!phone || !token) return res.status(400).json({ error: 'phone and token required' });
+  // 限流: 6 位验证码防暴力穷举
+  if (!rateOk('otp:vf:' + phone, 3600 * 1000, 10)) return res.status(429).json({ error: '尝试次数过多，请稍后再试' });
   try {
     const { error } = await db.auth.verifyOtp({ phone, token, type: 'sms' });
     if (error) return res.status(400).json({ error: error.message });
@@ -186,15 +306,23 @@ app.post('/api/auth/verify-otp', async (req, res) => {
         total_stamps = count || 0;
       }
     }
-    res.json({ success: true, isNew: !member, member: member ? { ...member, total_stamps } : null });
+    // OTP 通过 → 签发凭证: 老会员发 30 天登录 token, 新会员发 15 分钟注册票据
+    res.json({
+      success: true, isNew: !member,
+      member: member ? { ...member, total_stamps } : null,
+      token: member ? memberToken(member.id, merchantId) : null,
+      regTicket: member ? null : regTicketFor(phone, merchantId || ''),
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// ── MEMBER LOOKUP ─────────────────────────────────────────────
+// ── MEMBER LOOKUP (员工/商家用; 手机号反查会泄露隐私, 不再公开) ──
 app.get('/api/member', async (req, res) => {
   const { phone, merchantId } = req.query;
+  const auth = await requireStaffOrMerchant(req, res, merchantId);
+  if (!auth) return;
   const clean = phone.replace(/\D/g, '');
   let { data } = await db.from('members').select('*')
     .eq('merchant_id', merchantId).eq('phone', phone).maybeSingle();
@@ -209,6 +337,8 @@ app.get('/api/member', async (req, res) => {
 // ── MEMBER LOOKUP BY PHONE (path-param alias) ─────────────────
 app.get('/api/member/:phone', async (req, res) => {
   const { merchantId } = req.query;
+  const auth = await requireStaffOrMerchant(req, res, merchantId);
+  if (!auth) return;
   const phone = req.params.phone;
   const clean = phone.replace(/\D/g, '');
   let { data } = await db.from('members').select('*')
@@ -224,22 +354,27 @@ app.get('/api/member/:phone', async (req, res) => {
   res.json({ ...data, total_stamps: count || 0, stamps: count || 0 });
 });
 
-// ── REGISTER MEMBER ───────────────────────────────────────────
+// ── REGISTER MEMBER (必须持有 OTP 验证后签发的注册票据) ─────────
 async function registerMember(req, res) {
-  const { name, phone, merchantId } = req.body;
+  const { name, phone, merchantId, regTicket } = req.body;
+  const ticket = verifyToken(regTicket);
+  if (!ticket || ticket.t !== 'reg' || ticket.phone !== phone || (ticket.merchantId && ticket.merchantId !== merchantId))
+    return res.status(401).json({ error: '请先完成手机验证' });
   const { data, error } = await db.from('members')
     .insert({ name, phone, merchant_id: merchantId }).select().single();
   if (error) {
     if (error.code === '23505') return res.status(409).json({ error: 'Phone already registered' });
     return res.status(400).json({ error: error.message });
   }
-  res.json(data);
+  res.json({ ...data, token: memberToken(data.id, merchantId) });
 }
 app.post('/api/member', registerMember);
 app.post('/api/member/register', registerMember);   // alias
 
-// ── MEMBER ACTIVITY ───────────────────────────────────────────
+// ── MEMBER ACTIVITY (本人 token 才能看) ───────────────────────
 app.get('/api/member/:id/activity', async (req, res) => {
+  const mt = getMember(req);
+  if (!mt || mt.memberId !== req.params.id) return res.status(401).json({ error: '未授权' });
   const [stamps, redemptions] = await Promise.all([
     db.from('stamps').select('*').eq('member_id', req.params.id).order('created_at', { ascending: false }),
     db.from('redemptions').select('*').eq('member_id', req.params.id).order('created_at', { ascending: false }),
@@ -250,6 +385,9 @@ app.get('/api/member/:id/activity', async (req, res) => {
 // ── STAFF LOGIN ───────────────────────────────────────────────
 app.post('/api/staff/login', async (req, res) => {
   const { merchantId, pin } = req.body;
+  // 限流: 防 4 位 PIN 暴力穷举
+  if (!rateOk('pin:' + req.ip + ':' + merchantId, 3600 * 1000, 10))
+    return res.status(429).json({ error: '尝试次数过多，请 1 小时后再试' });
   const { data } = await db.from('staff')
     .select('*').eq('merchant_id', merchantId).eq('pin', pin).limit(1);
   if (!data?.length) return res.status(401).json({ error: 'Incorrect PIN' });
@@ -259,10 +397,13 @@ app.post('/api/staff/login', async (req, res) => {
 // ── SEARCH MEMBERS (staff) ────────────────────────────────────
 app.get('/api/members/search', async (req, res) => {
   const { q, merchantId } = req.query;
+  const auth = await requireStaffOrMerchant(req, res, merchantId);
+  if (!auth) return;
   if (!q?.trim()) return res.json([]);
+  const safe = q.replace(/[,()]/g, ' ');   // 防 PostgREST or-filter 注入
   const { data: members } = await db.from('members').select('*')
     .eq('merchant_id', merchantId)
-    .or(`name.ilike.%${q}%,phone.ilike.%${q}%`)
+    .or(`name.ilike.%${safe}%,phone.ilike.%${safe}%`)
     .limit(8);
   if (!members?.length) return res.json([]);
 
@@ -279,7 +420,8 @@ app.get('/api/members/search', async (req, res) => {
 // ── ALL MEMBERS (staff/dashboard) ─────────────────────────────
 app.get('/api/members/all', async (req, res) => {
   const { merchantId } = req.query;
-  if (!merchantId) return res.status(400).json({ error: 'merchantId required' });
+  const auth = await requireStaffOrMerchant(req, res, merchantId);
+  if (!auth) return;
   const { data: members } = await db.from('members').select('*')
     .eq('merchant_id', merchantId).order('created_at', { ascending: false });
   if (!members?.length) return res.json([]);
@@ -317,9 +459,11 @@ app.post('/api/stamp', async (req, res) => {
   res.json(data);
 });
 
-// ── REDEEM REWARD ─────────────────────────────────────────────
+// ── REDEEM REWARD (会员本人 token) ────────────────────────────
 app.post('/api/redeem', async (req, res) => {
   const { memberId, merchantId, rewardName } = req.body;
+  const mt = getMember(req);
+  if (!mt || mt.memberId !== memberId) return res.status(401).json({ error: '未授权' });
   const { data, error } = await db.from('redemptions')
     .insert({ member_id: memberId, merchant_id: merchantId, reward_name: rewardName })
     .select().single();
@@ -330,6 +474,8 @@ app.post('/api/redeem', async (req, res) => {
 // ── DASHBOARD STATS ───────────────────────────────────────────
 app.get('/api/dashboard/:merchantId', async (req, res) => {
   const mid = req.params.merchantId;
+  const auth = await requireStaffOrMerchant(req, res, mid);
+  if (!auth) return;
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7);
 
@@ -350,45 +496,63 @@ app.get('/api/dashboard/:merchantId', async (req, res) => {
   });
 });
 
-// ── STAFF MANAGEMENT ─────────────────────────────────────────
+// ── STAFF MANAGEMENT (商家后台专用) ──────────────────────────
 app.get('/api/staff/:merchantId', async (req, res) => {
+  const m = await requireMerchant(req, res, req.params.merchantId);
+  if (!m) return;
   const { data } = await db.from('staff').select('*').eq('merchant_id', req.params.merchantId);
   res.json(data || []);
 });
 
 app.post('/api/staff', async (req, res) => {
   const { merchantId, name, pin, branch } = req.body;
+  const m = await requireMerchant(req, res, merchantId);
+  if (!m) return;
   const { data, error } = await db.from('staff').insert({ merchant_id: merchantId, name, pin, branch }).select().single();
   if (error) return res.status(400).json({ error: error.message });
   res.json(data);
 });
 
 app.patch('/api/staff/:id', async (req, res) => {
-  const { data, error } = await db.from('staff').update(req.body).eq('id', req.params.id).select().single();
+  const { data: st } = await db.from('staff').select('id,merchant_id').eq('id', req.params.id).maybeSingle();
+  if (!st) return res.status(404).json({ error: 'staff not found' });
+  const m = await requireMerchant(req, res, st.merchant_id);
+  if (!m) return;
+  // 字段白名单
+  const patch = {};
+  for (const k of ['name', 'pin', 'branch']) if (req.body[k] !== undefined) patch[k] = req.body[k];
+  if (!Object.keys(patch).length) return res.status(400).json({ error: 'nothing to update' });
+  const { data, error } = await db.from('staff').update(patch).eq('id', req.params.id).select().single();
   if (error) return res.status(400).json({ error: error.message });
   res.json(data);
 });
 
-// ── PUSH SUBSCRIPTION ─────────────────────────────────────────
+// ── PUSH SUBSCRIPTION (会员本人 token) ────────────────────────
 app.post('/api/push/subscribe', async (req, res) => {
   const { memberId, subscription } = req.body;
+  const mt = getMember(req);
+  if (!mt || mt.memberId !== memberId) return res.status(401).json({ error: '未授权' });
   await db.from('push_subscriptions')
     .upsert({ member_id: memberId, subscription }, { onConflict: 'member_id' });
   res.json({ ok: true });
 });
 
-// ── BROADCAST PUSH NOTIFICATION ───────────────────────────────
+// ── BROADCAST PUSH NOTIFICATION (商家) ────────────────────────
 app.post('/api/push/broadcast', async (req, res) => {
   const { merchantId, title, body } = req.body;
+  const m = await requireMerchant(req, res, merchantId);
+  if (!m) return;
   const sent = await broadcastToMembers(merchantId, title, body);
   res.json({ sent });
 });
 
-// ── SCHEDULE A PUSH (定时发送) ─────────────────────────────────
+// ── SCHEDULE A PUSH (定时发送, 商家) ──────────────────────────
 app.post('/api/push/schedule', async (req, res) => {
   const { merchantId, title, body, scheduledAt } = req.body;
   if (!merchantId || !title || !body || !scheduledAt)
     return res.status(400).json({ error: 'merchantId, title, body, scheduledAt required' });
+  const m = await requireMerchant(req, res, merchantId);
+  if (!m) return;
   const { data, error } = await db.from('scheduled_pushes')
     .insert({ merchant_id: merchantId, title, body, scheduled_at: scheduledAt })
     .select().single();
@@ -396,26 +560,34 @@ app.post('/api/push/schedule', async (req, res) => {
   res.json(data);
 });
 
-// ── LIST SCHEDULED PUSHES ─────────────────────────────────────
+// ── LIST SCHEDULED PUSHES (商家) ──────────────────────────────
 app.get('/api/push/scheduled/:merchantId', async (req, res) => {
+  const m = await requireMerchant(req, res, req.params.merchantId);
+  if (!m) return;
   const { data } = await db.from('scheduled_pushes')
     .select('*').eq('merchant_id', req.params.merchantId)
     .order('scheduled_at', { ascending: false }).limit(50);
   res.json(data || []);
 });
 
-// ── CANCEL A SCHEDULED PUSH ───────────────────────────────────
+// ── CANCEL A SCHEDULED PUSH (商家) ────────────────────────────
 app.delete('/api/push/scheduled/:id', async (req, res) => {
+  const { data: job } = await db.from('scheduled_pushes').select('id,merchant_id').eq('id', req.params.id).maybeSingle();
+  if (!job) return res.status(404).json({ error: 'not found' });
+  const m = await requireMerchant(req, res, job.merchant_id);
+  if (!m) return;
   const { error } = await db.from('scheduled_pushes')
     .update({ status: 'cancelled' }).eq('id', req.params.id).eq('status', 'pending');
   if (error) return res.status(400).json({ error: error.message });
   res.json({ ok: true });
 });
 
-// ── AUTO WIN-BACK (一键挽留 N 天未到店的会员) ──────────────────
+// ── AUTO WIN-BACK (一键挽留 N 天未到店的会员, 商家) ────────────
 app.post('/api/push/winback', async (req, res) => {
   const { merchantId, days = 14, title, body } = req.body;
   if (!merchantId) return res.status(400).json({ error: 'merchantId required' });
+  const m = await requireMerchant(req, res, merchantId);
+  if (!m) return;
   const cutoff = new Date(Date.now() - days * 86400000).toISOString();
 
   const { data: members } = await db.from('members').select('id').eq('merchant_id', merchantId);
@@ -500,6 +672,8 @@ app.get('/api/branches/:merchantId', async (req, res) => {
 app.post('/api/branches', async (req, res) => {
   const { merchantId, name } = req.body;
   if (!merchantId || !name?.trim()) return res.status(400).json({ error: 'merchantId and name required' });
+  const m = await requireMerchant(req, res, merchantId);
+  if (!m) return;
   const { data, error } = await db.from('branches')
     .insert({ merchant_id: merchantId, name: name.trim() }).select().single();
   if (error) {
@@ -510,14 +684,20 @@ app.post('/api/branches', async (req, res) => {
 });
 
 app.delete('/api/branches/:id', async (req, res) => {
+  const { data: br } = await db.from('branches').select('id,merchant_id').eq('id', req.params.id).maybeSingle();
+  if (!br) return res.status(404).json({ error: 'not found' });
+  const m = await requireMerchant(req, res, br.merchant_id);
+  if (!m) return;
   const { error } = await db.from('branches').delete().eq('id', req.params.id);
   if (error) return res.status(400).json({ error: error.message });
   res.json({ ok: true });
 });
 
-// ── ADVANCED ANALYTICS ────────────────────────────────────────
+// ── ADVANCED ANALYTICS (商家) ─────────────────────────────────
 app.get('/api/analytics/:merchantId', async (req, res) => {
   const mid = req.params.merchantId;
+  const m = await requireMerchant(req, res, mid);
+  if (!m) return;
   const days = Math.min(parseInt(req.query.days) || 30, 90);
   const branch = req.query.branch && req.query.branch !== 'all' ? req.query.branch : null;
   const since = new Date(); since.setHours(0, 0, 0, 0); since.setDate(since.getDate() - (days - 1));
@@ -581,8 +761,10 @@ app.get('/api/analytics/:merchantId', async (req, res) => {
   });
 });
 
-// ── FEATURE TOGGLES (印章/存酒/储值券) ─────────────────────────
+// ── FEATURE TOGGLES (印章/存酒/储值券, 商家) ───────────────────
 app.put('/api/merchant/:slug/features', async (req, res) => {
+  const m = await requireMerchantBySlug(req, res, req.params.slug);
+  if (!m) return;
   const { feature_stamp, feature_bottle, feature_voucher } = req.body;
   const patch = {};
   if (feature_stamp !== undefined) patch.feature_stamp = !!feature_stamp;
@@ -595,8 +777,12 @@ app.put('/api/merchant/:slug/features', async (req, res) => {
 });
 
 // ── BOTTLE KEEP (存酒) ─────────────────────────────────────────
+// 会员本人 token 或 员工 PIN 均可查看
 app.get('/api/bottles', async (req, res) => {
   const { memberId, merchantId } = req.query;
+  const mt = getMember(req);
+  const ok = (mt && mt.memberId === memberId) || await getStaff(req, merchantId);
+  if (!ok) return res.status(401).json({ error: '未授权' });
   const { data } = await db.from('bottle_keeps')
     .select('id,brand,size_ml,remaining_ml,photo_url,expires_at,created_at')
     .eq('member_id', memberId).eq('merchant_id', merchantId).gt('remaining_ml', 0)
@@ -607,6 +793,8 @@ app.get('/api/bottles', async (req, res) => {
 app.post('/api/bottles', async (req, res) => {
   const { memberId, merchantId, brand, size_ml, photo_url, expires_at } = req.body;
   if (!memberId || !merchantId || !brand || !size_ml) return res.status(400).json({ error: 'memberId, merchantId, brand, size_ml required' });
+  const staff = await getStaff(req, merchantId);
+  if (!staff) return res.status(401).json({ error: '未授权' });
   const size = parseInt(size_ml);
   const { data, error } = await db.from('bottle_keeps').insert({
     member_id: memberId, merchant_id: merchantId, brand, size_ml: size, remaining_ml: size,
@@ -621,8 +809,10 @@ app.post('/api/bottles/:id/pour', async (req, res) => {
   const { amount_ml, note, staffId } = req.body;
   const amt = parseInt(amount_ml);
   if (!amt || amt <= 0) return res.status(400).json({ error: 'amount_ml 无效' });
-  const { data: b } = await db.from('bottle_keeps').select('remaining_ml').eq('id', req.params.id).maybeSingle();
+  const { data: b } = await db.from('bottle_keeps').select('remaining_ml,merchant_id').eq('id', req.params.id).maybeSingle();
   if (!b) return res.status(404).json({ error: '存酒不存在' });
+  const staff = await getStaff(req, b.merchant_id);
+  if (!staff) return res.status(401).json({ error: '未授权' });
   if (b.remaining_ml < amt) return res.status(400).json({ error: '剩余酒量不足' });
   const remaining = b.remaining_ml - amt;
   const { error } = await db.from('bottle_keeps').update({ remaining_ml: remaining }).eq('id', req.params.id);
@@ -633,7 +823,8 @@ app.post('/api/bottles/:id/pour', async (req, res) => {
 
 app.get('/api/bottles/all', async (req, res) => {
   const { merchantId } = req.query;
-  if (!merchantId) return res.status(400).json({ error: 'merchantId required' });
+  const m = await requireMerchant(req, res, merchantId);
+  if (!m) return;
   const { data } = await db.from('bottle_keeps').select('*,members(name,phone)')
     .eq('merchant_id', merchantId)
     .order('expires_at', { ascending: true, nullsFirst: false });
@@ -642,14 +833,23 @@ app.get('/api/bottles/all', async (req, res) => {
 });
 
 app.get('/api/bottles/:id/transactions', async (req, res) => {
+  const { data: bk } = await db.from('bottle_keeps').select('member_id,merchant_id').eq('id', req.params.id).maybeSingle();
+  if (!bk) return res.status(404).json({ error: '存酒不存在' });
+  const mt = getMember(req);
+  const ok = (mt && mt.memberId === bk.member_id) || await getStaff(req, bk.merchant_id);
+  if (!ok) return res.status(401).json({ error: '未授权' });
   const { data } = await db.from('bottle_transactions').select('*')
     .eq('bottle_keep_id', req.params.id).order('created_at', { ascending: false }).limit(20);
   res.json(data || []);
 });
 
 // ── VOUCHERS (储值券) ──────────────────────────────────────────
+// 会员本人 token 或 员工 PIN 均可查看
 app.get('/api/vouchers', async (req, res) => {
   const { memberId, merchantId } = req.query;
+  const mt = getMember(req);
+  const ok = (mt && mt.memberId === memberId) || await getStaff(req, merchantId);
+  if (!ok) return res.status(401).json({ error: '未授权' });
   const { data } = await db.from('vouchers').select('id,type,label,total,remaining,expires_at')
     .eq('member_id', memberId).eq('merchant_id', merchantId).gt('remaining', 0)
     .order('created_at', { ascending: false });
@@ -659,6 +859,8 @@ app.get('/api/vouchers', async (req, res) => {
 app.post('/api/vouchers', async (req, res) => {
   const { memberId, merchantId, type, label, total, expires_at } = req.body;
   if (!memberId || !merchantId || total == null) return res.status(400).json({ error: 'memberId, merchantId, total required' });
+  const staff = await getStaff(req, merchantId);
+  if (!staff) return res.status(401).json({ error: '未授权' });
   const tot = Number(total);
   const { data, error } = await db.from('vouchers').insert({
     member_id: memberId, merchant_id: merchantId, type: type || 'session', label: label || null,
@@ -673,8 +875,10 @@ app.post('/api/vouchers/:id/redeem', async (req, res) => {
   const { amount, note, staffId } = req.body;
   const amt = Number(amount);
   if (!amt || amt <= 0) return res.status(400).json({ error: 'amount 无效' });
-  const { data: v } = await db.from('vouchers').select('remaining').eq('id', req.params.id).maybeSingle();
+  const { data: v } = await db.from('vouchers').select('remaining,merchant_id').eq('id', req.params.id).maybeSingle();
   if (!v) return res.status(404).json({ error: '券不存在' });
+  const staff = await getStaff(req, v.merchant_id);
+  if (!staff) return res.status(401).json({ error: '未授权' });
   if (v.remaining < amt) return res.status(400).json({ error: '余额不足' });
   const remaining = v.remaining - amt;
   const { error } = await db.from('vouchers').update({ remaining }).eq('id', req.params.id);
@@ -685,7 +889,8 @@ app.post('/api/vouchers/:id/redeem', async (req, res) => {
 
 app.get('/api/vouchers/all', async (req, res) => {
   const { merchantId } = req.query;
-  if (!merchantId) return res.status(400).json({ error: 'merchantId required' });
+  const m = await requireMerchant(req, res, merchantId);
+  if (!m) return;
   const { data } = await db.from('vouchers').select('*,members(name,phone)')
     .eq('merchant_id', merchantId).gt('remaining', 0).order('created_at', { ascending: false });
   const vouchers = (data || []).map(v => ({ ...v, member_name: v.members?.name || '', member_phone: v.members?.phone || '', members: undefined }));

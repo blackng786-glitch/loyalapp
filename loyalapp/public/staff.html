@@ -287,6 +287,15 @@ let pendingMemberId='',pendingMemberName='';
 let scanStream=null,scanTimer=null,scanActive=false;
 let deferredInstall=null;
 
+// 登录后所有 /api/ 请求自动附带员工 PIN (后端鉴权)
+const _fetch=window.fetch.bind(window);
+window.fetch=(url,opts)=>{
+  if(typeof url==='string'&&url.startsWith('/api/')&&S.staff&&S.staff.pin){
+    opts=opts||{};opts.headers=Object.assign({},opts.headers||{},{'x-staff-pin':S.staff.pin});
+  }
+  return _fetch(url,opts);
+};
+
 async function init(){
   const slug=new URLSearchParams(location.search).get('m');
   if(!slug){document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;color:#9A9590;font-size:13px">Add ?m=your-slug to the URL.</div>';return;}

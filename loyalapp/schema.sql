@@ -174,7 +174,10 @@ create index idx_voucher_member    on public.vouchers(member_id);
 create index idx_voucher_merchant  on public.vouchers(merchant_id);
 create index idx_vtx_voucher      on public.voucher_transactions(voucher_id);
 
--- ROW LEVEL SECURITY (open via anon key — app-layer auth handles security)
+-- ROW LEVEL SECURITY — 默认拒绝 (deny-by-default)
+-- 不创建任何 policy: anon key 无法读写任何表。
+-- 全部数据操作经 server.js (service key, 绕过 RLS) + 应用层鉴权:
+--   商家 dashboard → Supabase Auth JWT; 员工 → PIN; 顾客 → OTP 签发的 HMAC token。
 alter table public.merchants         enable row level security;
 alter table public.staff             enable row level security;
 alter table public.members           enable row level security;
@@ -187,19 +190,6 @@ alter table public.bottle_keeps          enable row level security;
 alter table public.bottle_transactions   enable row level security;
 alter table public.vouchers              enable row level security;
 alter table public.voucher_transactions  enable row level security;
-
-create policy "open_merchants"           on public.merchants              for all using (true) with check (true);
-create policy "open_staff"               on public.staff                  for all using (true) with check (true);
-create policy "open_members"             on public.members                for all using (true) with check (true);
-create policy "open_stamps"              on public.stamps                 for all using (true) with check (true);
-create policy "open_redemptions"         on public.redemptions            for all using (true) with check (true);
-create policy "open_push"                on public.push_subscriptions     for all using (true) with check (true);
-create policy "open_sched"               on public.scheduled_pushes       for all using (true) with check (true);
-create policy "open_branches"            on public.branches               for all using (true) with check (true);
-create policy "open_bottle_keeps"        on public.bottle_keeps           for all using (true) with check (true);
-create policy "open_bottle_transactions" on public.bottle_transactions    for all using (true) with check (true);
-create policy "open_vouchers"            on public.vouchers               for all using (true) with check (true);
-create policy "open_voucher_transactions" on public.voucher_transactions  for all using (true) with check (true);
 
 -- ================================================================
 -- DEMO SEED DATA (optional — delete before production)

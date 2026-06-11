@@ -1,4 +1,4 @@
-const CACHE = 'loyalapp-v1';
+const CACHE = 'chopkar-v2';   // bump 强制旧客户端刷新缓存 (OTP+token 鉴权上线)
 const ASSETS = ['/card', '/staff', '/icons/icon-192.png'];
 
 self.addEventListener('install', e => {

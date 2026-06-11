@@ -186,9 +186,18 @@ button{font-family:inherit;cursor:pointer}
 
 <script>
 const API='';
-const S={slug:null,merchant:null,memberId:null,bottles:[],otpPhone:''};
+const S={slug:null,merchant:null,memberId:null,bottles:[],otpPhone:'',token:null,regTicket:null};
 let cdTimer=null;
 const SESSION_DAYS=30;
+
+// 所有 /api/ 请求自动附带会员 token (后端鉴权)
+const _fetch=window.fetch.bind(window);
+window.fetch=(url,opts)=>{
+  if(typeof url==='string'&&url.startsWith('/api/')&&S.token){
+    opts=opts||{};opts.headers=Object.assign({},opts.headers||{},{'x-member-token':S.token});
+  }
+  return _fetch(url,opts);
+};
 
 function $(id){return document.getElementById(id);}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -196,8 +205,8 @@ let _tt;function toast(msg,type){const el=$('toast');el.textContent=msg;el.class
 function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));$('v-'+id).classList.add('on');}
 
 // ── Session management (30-day expiry, shared with card.html) ──
-function saveSession(member){
-  const session={memberId:member.id,phone:member.phone,name:member.name,expiresAt:Date.now()+SESSION_DAYS*86400000};
+function saveSession(member,token){
+  const session={memberId:member.id,phone:member.phone,name:member.name,token:token||S.token,expiresAt:Date.now()+SESSION_DAYS*86400000};
   try{
     localStorage.setItem('chopkar_'+S.slug+'_session',JSON.stringify(session));
     localStorage.setItem('chopkar_'+S.slug+'_memberId',member.id);
@@ -207,11 +216,10 @@ function saveSession(member){
 function getSession(){
   try{
     const raw=localStorage.getItem('chopkar_'+S.slug+'_session');
-    if(raw){const s=JSON.parse(raw);if(Date.now()<s.expiresAt) return s;clearSession();return null;}
-    // backward compat
-    const mid=localStorage.getItem('chopkar_'+S.slug+'_memberId');
-    if(mid) return {memberId:mid};
-    return null;
+    if(!raw)return null;
+    const s=JSON.parse(raw);
+    if(!s.token||Date.now()>=s.expiresAt){clearSession();return null;}  // 旧格式无 token → 重新 OTP
+    return s;
   }catch(e){return null;}
 }
 function clearSession(){
@@ -257,11 +265,11 @@ async function init(){
     S.merchant=await res.json();
   }catch(e){show('error');return;}
   applyTheme(S.merchant);
-  // Check session (with 30-day expiry)
+  // Check session (with 30-day expiry + token)
   const sess=getSession();
-  if(sess){
-    S.memberId=sess.memberId||null;
-    if(S.memberId){show('main');loadData();return;}
+  if(sess&&sess.memberId&&sess.token){
+    S.memberId=sess.memberId;S.token=sess.token;
+    show('main');loadData();return;
   }
   show('auth');
   setupBOtpInputs();
@@ -293,8 +301,8 @@ async function bVerifyOtp(){
     const res=await fetch(API+'/api/auth/verify-otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:S.otpPhone,token:code,merchantId:S.merchant.id})});
     const data=await res.json();
     if(!res.ok){$('b-otp-err').textContent=data.error||'验证失败';btn.disabled=false;btn.innerHTML='<i class="ti ti-shield-check"></i> 验证';return;}
-    if(data.isNew){show('newname');$('b-nn-name').focus();return;}
-    bLoginWithMember(data.member);
+    if(data.isNew){S.regTicket=data.regTicket;show('newname');$('b-nn-name').focus();return;}
+    bLoginWithMember(data.member,data.token);
   }catch(e){$('b-otp-err').textContent='网络错误';btn.disabled=false;btn.innerHTML='<i class="ti ti-shield-check"></i> 验证';}
 }
 
@@ -304,17 +312,18 @@ async function bCompleteReg(){
   if(!name){$('b-nn-err').textContent='请输入姓名';return;}
   const btn=$('b-nn-btn');btn.disabled=true;btn.textContent='注册中...';
   try{
-    const res=await fetch(API+'/api/member',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,phone:S.otpPhone,merchantId:S.merchant.id})});
+    const res=await fetch(API+'/api/member',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,phone:S.otpPhone,merchantId:S.merchant.id,regTicket:S.regTicket})});
     const data=await res.json();
     if(!res.ok){$('b-nn-err').textContent=data.error||'注册失败';return;}
-    bLoginWithMember(data);toast('Welcome, '+name.split(' ')[0]+'!');
+    bLoginWithMember(data,data.token);toast('Welcome, '+name.split(' ')[0]+'!');
   }catch(e){$('b-nn-err').textContent='网络错误';}
   finally{btn.disabled=false;btn.innerHTML='<i class="ti ti-check"></i> 完成注册';}
 }
 
-function bLoginWithMember(member){
+function bLoginWithMember(member,token){
   S.memberId=member.id;
-  saveSession(member);
+  S.token=token||S.token;
+  saveSession(member,S.token);
   show('main');loadData();
 }
 
@@ -356,11 +365,11 @@ async function loadData(){
   $('bottles-wrap').innerHTML='<div class="loader"><i class="ti ti-loader-2"></i></div>';
   const q='memberId='+encodeURIComponent(S.memberId)+'&merchantId='+encodeURIComponent(S.merchant.id);
   try{
-    const [bottles,vouchers]=await Promise.all([
-      fetch(API+'/api/bottles?'+q).then(r=>r.json()).catch(()=>[]),
-      S.merchant.feature_voucher?fetch(API+'/api/vouchers?'+q).then(r=>r.json()).catch(()=>[]):Promise.resolve([]),
-    ]);
-    S.bottles=bottles||[];
+    const br=await fetch(API+'/api/bottles?'+q);
+    if(br.status===401){S.token=null;clearSession();show('auth');setupBOtpInputs();return;}  // token 失效 → 重新登录
+    const bottles=await br.json().catch(()=>[]);
+    const vouchers=S.merchant.feature_voucher?await fetch(API+'/api/vouchers?'+q).then(r=>r.json()).catch(()=>[]):[];
+    S.bottles=Array.isArray(bottles)?bottles:[];
     renderBottles(S.bottles);
     if(S.merchant.feature_voucher){$('vouchers-section').style.display='block';renderVouchers(vouchers||[]);}
   }catch(e){toast('加载失败','err');}

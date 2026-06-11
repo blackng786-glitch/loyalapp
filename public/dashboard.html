@@ -513,6 +513,19 @@ const S={user:null,merchant:null,services:[],allMembers:[],filteredMembers:[],br
 let deferredInstall=null;
 const charts={};
 
+// 所有 /api/ 请求自动附带 Supabase JWT (后端鉴权)
+const _fetch=window.fetch.bind(window);
+window.fetch=async(url,opts)=>{
+  if(typeof url==='string'&&url.startsWith('/api/')){
+    opts=opts||{};opts.headers=Object.assign({},opts.headers||{});
+    try{
+      const {data:{session}}=await db.auth.getSession();
+      if(session)opts.headers['Authorization']='Bearer '+session.access_token;
+    }catch(e){}
+  }
+  return _fetch(url,opts);
+};
+
 async function init(){
   const {data:{session}}=await db.auth.getSession();
   if(session){S.user=session.user;await loadMerchant();}
