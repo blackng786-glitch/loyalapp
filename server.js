@@ -9,6 +9,13 @@ const app = express();
 app.set('trust proxy', 1);                 // Railway 反代后取真实客户端 IP (限流用)
 app.use(cors());
 app.use(express.json({ limit: '6mb' }));   // 6mb 以容纳 base64 logo 上传
+app.get('/bottle', (req, res) => { res.redirect(301, '/card' + (req.query.m ? '?m=' + encodeURIComponent(req.query.m) : '')); });
+app.get('/api/health', async (req, res) => {
+  try {
+    const { data, error } = await db.from('merchants').select('slug').limit(1);
+    res.json({ db: error ? 'error' : 'ok', count: data?.length ?? 0, error: error?.message || null });
+  } catch (e) { res.status(500).json({ db: 'crash', error: e.message }); }
+});
 app.use(express.static('public'));
 
 // ── DB (service key for server-side operations) ──────────────
