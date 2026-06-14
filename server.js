@@ -14,8 +14,13 @@ app.get('/api/health', async (req, res) => {
   try {
     const k = process.env.SUPABASE_SERVICE_KEY || '';
     const role = k.includes('.') ? JSON.parse(Buffer.from(k.split('.')[1], 'base64').toString()).role : 'missing';
-    const { data, error } = await db.from('merchants').select('slug').limit(1);
-    res.json({ db: error ? 'error' : 'ok', count: data?.length ?? 0, role, keyLen: k.length, keyEnd: k.slice(-6), error: error?.message || null });
+    const { data, error } = await db.from('merchants').select('id').limit(1);
+    const testPhone = '_health_' + Date.now();
+    const mid = data?.[0]?.id;
+    const ins = mid ? await db.from('members').insert({ name: 'health-test', phone: testPhone, merchant_id: mid }).select().single() : { error: { message: 'no merchant found', code: 'NO_MERCHANT' } };
+    let cleaned = false;
+    if (ins.data?.id) { await db.from('members').delete().eq('id', ins.data.id); cleaned = true; }
+    res.json({ db: error ? 'error' : 'ok', count: data?.length ?? 0, role, keyLen: k.length, keyEnd: k.slice(-6), readErr: error?.message || null, insertOk: !ins.error, insertErr: ins.error?.message || null, insertCode: ins.error?.code || null, cleaned });
   } catch (e) { res.status(500).json({ db: 'crash', error: e.message }); }
 });
 app.use(express.static('public'));
