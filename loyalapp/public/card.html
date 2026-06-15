@@ -168,6 +168,29 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
 .resend-row{text-align:center;margin-top:10px}
 .resend-btn{background:transparent;border:none;color:var(--brand);font-size:13px;cursor:pointer;padding:4px 8px;transition:opacity .2s}
 .resend-btn:disabled{color:var(--t3);cursor:not-allowed}
+/* Bottles */
+.bottle{background:var(--s1);border:1px solid var(--b2);border-radius:var(--r);padding:15px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.25)}
+.b-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px}
+.b-brand{font-size:17px;font-weight:500}
+.b-photo{width:44px;height:44px;border-radius:10px;object-fit:cover;background:var(--s3);flex-shrink:0}
+.b-exp{font-size:11px;font-family:'DM Mono',monospace;color:var(--t3);margin-top:3px}
+.b-exp.warn{color:#E24B4A}
+.b-amt{display:flex;justify-content:space-between;font-size:12px;font-family:'DM Mono',monospace;color:var(--t2)}
+.b-amt b{color:var(--t1);font-weight:500}
+.b-foot{display:flex;justify-content:flex-end;margin-top:8px}
+.tx-btn{background:transparent;border:1px solid var(--b3);border-radius:20px;color:var(--t2);font-size:11px;padding:4px 12px}
+.tx-list{margin-top:10px;border-top:1px solid var(--b1);padding-top:8px;display:none}
+.tx-list.on{display:block}
+.tx-item{display:flex;justify-content:space-between;font-size:11px;font-family:'DM Mono',monospace;color:var(--t3);padding:4px 0}
+.voucher{background:var(--s1);border:1px solid var(--b2);border-radius:var(--r);padding:13px;margin-bottom:10px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,0.25)}
+.v-ico{width:40px;height:40px;border-radius:10px;background:rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.v-ico i{color:var(--brand);font-size:18px}
+.v-body{flex:1;min-width:0}
+.v-label{font-size:14px;font-weight:500}
+.v-meta{font-size:11px;color:var(--t3);font-family:'DM Mono',monospace;margin-top:2px}
+.v-rem{text-align:right}
+.v-rem-val{font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--brand);line-height:1}
+.v-rem-lbl{font-size:10px;color:var(--t3)}
 </style>
 </head>
 <body>
@@ -308,10 +331,11 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
     </div>
   </div>
   <div class="tabs" id="mem-tabs">
-    <button class="tab on" onclick="mTab(0,'stamps')">Stamps</button>
-    <button class="tab" onclick="mTab(1,'rewards')">Rewards</button>
-    <button class="tab" onclick="mTab(2,'history')">History</button>
-    <button class="tab" onclick="mTab(3,'qr')">My QR</button>
+    <button class="tab on" data-pane="stamps" onclick="mTab('stamps')">Stamps</button>
+    <button class="tab" data-pane="bottles" onclick="mTab('bottles')" id="tab-bottles" style="display:none"><i class="ti ti-bottle" style="font-size:13px;vertical-align:-1px" aria-hidden="true"></i> Bottles</button>
+    <button class="tab" data-pane="rewards" onclick="mTab('rewards')">Rewards</button>
+    <button class="tab" data-pane="history" onclick="mTab('history')">History</button>
+    <button class="tab" data-pane="qr" onclick="mTab('qr')">My QR</button>
   </div>
   <div class="pane on" id="tp-stamps">
     <div class="box">
@@ -328,6 +352,13 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
         <div style="font-size:11px;color:var(--t3)" id="card-num">Card 1</div>
       </div>
       <div class="prog"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+    </div>
+  </div>
+  <div class="pane" id="tp-bottles">
+    <div id="bottles-wrap"></div>
+    <div id="vouchers-section" style="display:none">
+      <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin:8px 2px 12px;display:flex;align-items:center;gap:8px"><i class="ti ti-ticket" style="color:var(--brand)" aria-hidden="true"></i> 我的券</div>
+      <div id="vouchers-wrap"></div>
     </div>
   </div>
   <div class="pane" id="tp-rewards"><div id="rewards-wrap"></div></div>
@@ -636,6 +667,9 @@ function renderMemberView(){
   $('card-num').textContent='Card '+cardNo;
   $('prog-fill').style.width=Math.round(current/m.stamps_per_card*100)+'%';
   renderRewards(m,total,pts,free);renderHistory();renderQR();renderPushSection();
+  const btTab=$('tab-bottles');
+  if(btTab){btTab.style.display=m.feature_bottle?'':'none';}
+  if(m.feature_bottle)loadBottleData();
 }
 
 function renderRewards(m,total,pts,free){
@@ -675,9 +709,9 @@ async function setupPush(){
   }catch(e){toast('Could not enable notifications');}
 }
 
-function mTab(idx,id){
-  document.querySelectorAll('#mem-tabs .tab').forEach((t,i)=>t.classList.toggle('on',i===idx));
-  ['stamps','rewards','history','qr'].forEach(n=>{const el=$('tp-'+n);if(el)el.classList.toggle('on',n===id);});
+function mTab(id){
+  document.querySelectorAll('#mem-tabs .tab').forEach(t=>t.classList.toggle('on',t.dataset.pane===id));
+  document.querySelectorAll('#v-member .pane').forEach(p=>p.classList.toggle('on',p.id==='tp-'+id));
 }
 
 function openRedeem(name){S.pendingRedeem=name;$('redeem-modal-sub').textContent='Redeem: '+name;$('redeem-modal').classList.add('on');}
@@ -697,6 +731,78 @@ function mk(t){return document.createElement(t);}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function fmtDate(s){return new Date(s).toLocaleDateString('en-MY',{day:'numeric',month:'short',year:'numeric'});}
 function urlB64(b64){const pad='='.repeat((4-b64.length%4)%4);const raw=atob((b64+pad).replace(/-/g,'+').replace(/_/g,'/'));return new Uint8Array([...raw].map(c=>c.charCodeAt(0)));}
+// ── BOTTLES ────────────────────────────────────────────────
+function progColor(pct){return pct>50?'var(--brand)':(pct>=20?'#EF9F27':'#E24B4A');}
+function daysLeft(iso){if(!iso)return null;return Math.ceil((new Date(iso)-new Date())/86400000);}
+
+async function loadBottleData(){
+  const wrap=$('bottles-wrap');
+  wrap.innerHTML='<div class="loader"><i class="ti ti-loader-2" aria-hidden="true"></i></div>';
+  const q='memberId='+encodeURIComponent(S.member.id)+'&merchantId='+encodeURIComponent(S.merchant.id);
+  try{
+    const br=await fetch(API+'/api/bottles?'+q);
+    if(br.status===401)return;
+    const bottles=await br.json().catch(()=>[]);
+    renderBottles(Array.isArray(bottles)?bottles:[]);
+    if(S.merchant.feature_voucher){
+      const vouchers=await fetch(API+'/api/vouchers?'+q).then(r=>r.json()).catch(()=>[]);
+      $('vouchers-section').style.display='block';
+      renderVouchers(vouchers||[]);
+    }
+  }catch(e){toast('加载存酒失败');}
+}
+
+function renderBottles(list){
+  const wrap=$('bottles-wrap');
+  if(!list.length){wrap.innerHTML='<div class="empty"><i class="ti ti-bottle-off" aria-hidden="true"></i><p>暂无存酒<br>请联系吧台登记</p></div>';return;}
+  wrap.innerHTML=list.map(b=>{
+    const pct=Math.max(0,Math.min(100,Math.round(b.remaining_ml/b.size_ml*100)));
+    const col=progColor(pct);
+    const d=daysLeft(b.expires_at);
+    let exp='';
+    if(d!==null){
+      if(d<0)exp='<div class="b-exp warn">已过期</div>';
+      else if(d<=7)exp='<div class="b-exp warn">'+d+' 天后到期</div>';
+      else exp='<div class="b-exp">'+d+' 天后到期</div>';
+    }
+    const photo=b.photo_url?'<img class="b-photo" src="'+esc(b.photo_url)+'" alt="">':'';
+    return '<div class="bottle">'
+      +'<div class="b-top"><div><div class="b-brand">'+esc(b.brand)+'</div>'+exp+'</div>'+photo+'</div>'
+      +'<div class="prog"><div class="prog-fill" style="width:'+pct+'%;background:'+col+'"></div></div>'
+      +'<div class="b-amt"><span>剩余 <b>'+b.remaining_ml+'ml</b></span><span>总 '+b.size_ml+'ml · '+pct+'%</span></div>'
+      +'<div class="b-foot"><button class="tx-btn" onclick="toggleTx(\''+b.id+'\')"><i class="ti ti-history" aria-hidden="true"></i> 流水</button></div>'
+      +'<div class="tx-list" id="tx-'+b.id+'"></div>'
+      +'</div>';
+  }).join('');
+}
+
+async function toggleTx(id){
+  const box=$('tx-'+id);
+  if(box.classList.contains('on')){box.classList.remove('on');return;}
+  box.classList.add('on');box.innerHTML='<div class="tx-item"><span>加载中...</span></div>';
+  const tx=await fetch(API+'/api/bottles/'+id+'/transactions').then(r=>r.json()).catch(()=>[]);
+  const pours=(tx||[]).filter(t=>t.type==='pour'||t.type==='deposit').slice(0,5);
+  if(!pours.length){box.innerHTML='<div class="tx-item"><span>暂无记录</span></div>';return;}
+  box.innerHTML=pours.map(t=>{
+    const sign=t.type==='deposit'?'+':'-';
+    const label=t.type==='deposit'?'存入':'倒酒';
+    return '<div class="tx-item"><span>'+label+' '+sign+t.amount_ml+'ml</span><span>'+fmtDate(t.created_at)+'</span></div>';
+  }).join('');
+}
+
+function renderVouchers(list){
+  const wrap=$('vouchers-wrap');
+  if(!list.length){wrap.innerHTML='<div class="empty"><i class="ti ti-ticket-off" aria-hidden="true"></i><p>暂无储值券</p></div>';return;}
+  wrap.innerHTML=list.map(v=>{
+    const unit=v.type==='session'?'次':'';
+    const d=daysLeft(v.expires_at);
+    const exp=d!==null?('<div class="v-meta">'+(d<0?'已过期':d+' 天后到期')+'</div>'):'';
+    return '<div class="voucher"><div class="v-ico"><i class="ti ti-ticket" aria-hidden="true"></i></div>'
+      +'<div class="v-body"><div class="v-label">'+esc(v.label||(v.type==='session'?'次卡':'储值卡'))+'</div>'+exp+'</div>'
+      +'<div class="v-rem"><div class="v-rem-val">'+(+v.remaining)+'</div><div class="v-rem-lbl">剩余'+unit+'</div></div></div>';
+  }).join('');
+}
+
 let _tt;function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('on');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('on'),2500);}
 </script>
 </body>

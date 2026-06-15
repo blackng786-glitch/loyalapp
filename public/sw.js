@@ -1,4 +1,4 @@
-const CACHE = 'chopkar-v2';   // bump 强制旧客户端刷新缓存 (OTP+token 鉴权上线)
+const CACHE = 'chopkar-v3';   // bump: bottle merge into card + OTP auth fix
 const ASSETS = ['/card', '/staff', '/icons/icon-192.png'];
 
 self.addEventListener('install', e => {
@@ -31,7 +31,7 @@ self.addEventListener('fetch', e => {
 
 // ── PUSH NOTIFICATIONS ────────────────────────────────────────
 self.addEventListener('push', e => {
-  let data = { title: 'LoyalApp', body: 'You have a new update!' };
+  let data = { title: 'ChopKar', body: 'You have a new update!' };
   try { data = e.data.json(); } catch (_) {}
   e.waitUntil(
     self.registration.showNotification(data.title, {
