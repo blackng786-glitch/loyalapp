@@ -12,21 +12,21 @@ app.use(express.json({ limit: '6mb' }));   // 6mb 以容纳 base64 logo 上传
 app.get('/bottle', (req, res) => { res.redirect(301, '/card' + (req.query.m ? '?m=' + encodeURIComponent(req.query.m) : '')); });
 app.get('/api/health', async (req, res) => {
   try {
-    const k = process.env.SUPABASE_SERVICE_KEY || '';
-    const role = k.includes('.') ? JSON.parse(Buffer.from(k.split('.')[1], 'base64').toString()).role : 'missing';
     const { data, error } = await db.from('merchants').select('id').limit(1);
-    const testPhone = '_health_' + Date.now();
-    const mid = data?.[0]?.id;
-    const ins = mid ? await db.from('members').insert({ name: 'health-test', phone: testPhone, merchant_id: mid }).select().single() : { error: { message: 'no merchant found', code: 'NO_MERCHANT' } };
-    let cleaned = false;
-    if (ins.data?.id) { await db.from('members').delete().eq('id', ins.data.id); cleaned = true; }
-    res.json({ db: error ? 'error' : 'ok', count: data?.length ?? 0, role, keyLen: k.length, keyEnd: k.slice(-6), readErr: error?.message || null, insertOk: !ins.error, insertErr: ins.error?.message || null, insertCode: ins.error?.code || null, cleaned });
+    res.json({ db: error ? 'error' : 'ok', count: data?.length ?? 0, error: error?.message || null });
   } catch (e) { res.status(500).json({ db: 'crash', error: e.message }); }
 });
 app.use(express.static('public'));
 
 // ── DB (service key for server-side operations) ──────────────
-const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY, {
+  auth: { autoRefreshToken: false, persistSession: false }
+});
+// Separate client for OTP auth — verifyOtp() stores a user session internally,
+// which would override service_role on the main db client and break RLS bypass.
+const authClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY, {
+  auth: { autoRefreshToken: false, persistSession: false }
+});
 
 // ── AUTH HELPERS ─────────────────────────────────────────────
 // HMAC 签名 token (会员登录态 / 注册票据)。密钥优先用环境变量, 否则从 service key 派生。
@@ -282,7 +282,7 @@ app.post('/api/auth/send-otp', async (req, res) => {
   if (!rateOk('otp:pd:' + phone, 24 * 3600 * 1000, 8)) return res.status(429).json({ error: '该号码今日发送次数已达上限' });
   if (!rateOk('otp:ip:' + req.ip, 3600 * 1000, 15))    return res.status(429).json({ error: '请求过于频繁，请稍后再试' });
   try {
-    const { error } = await db.auth.signInWithOtp({ phone });
+    const { error } = await authClient.auth.signInWithOtp({ phone });
     if (error) return res.status(400).json({ error: error.message });
     res.json({ success: true });
   } catch (e) {
@@ -296,7 +296,7 @@ app.post('/api/auth/verify-otp', async (req, res) => {
   // 限流: 6 位验证码防暴力穷举
   if (!rateOk('otp:vf:' + phone, 3600 * 1000, 10)) return res.status(429).json({ error: '尝试次数过多，请稍后再试' });
   try {
-    const { error } = await db.auth.verifyOtp({ phone, token, type: 'sms' });
+    const { error } = await authClient.auth.verifyOtp({ phone, token, type: 'sms' });
     if (error) return res.status(400).json({ error: error.message });
 
     // 查 members 表找这个 phone 的会员
