@@ -202,6 +202,7 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
         <div><label class="label" for="su-email">Email</label><input class="input" id="su-email" type="email" placeholder="you@business.com"></div>
         <div><label class="label" for="su-pass">Password</label><input class="input" id="su-pass" type="password" placeholder="Min. 8 characters"></div>
         <button class="btn btn-gold" id="signup-btn" onclick="signUp()"><i class="ti ti-user-plus" aria-hidden="true"></i> Create Account</button>
+        <div id="signup-notice" style="display:none;background:rgba(30,160,110,0.12);border:1px solid rgba(30,160,110,0.3);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--t2);text-align:center;line-height:1.6"><i class="ti ti-mail-check" style="color:#1EA06E;font-size:18px;vertical-align:middle;margin-right:4px"></i> Check your email to confirm your account, then sign in below.</div>
         <div style="text-align:center"><button style="background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;text-decoration:underline" onclick="toggleSignup()">Already have an account? Sign in</button></div>
       </div>
     </div>
@@ -218,8 +219,8 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
       <div class="card-title"><i class="ti ti-building-store" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>Business Info</div>
       <div class="card-sub">Basic details about your business</div>
       <div class="two-col">
-        <div class="field"><label class="label">Business Name</label><input class="input" id="w-name" type="text" placeholder="Neue Car Spa"></div>
-        <div class="field"><label class="label">Slug (URL ID)</label><input class="input" id="w-slug" type="text" placeholder="neue-car-spa" oninput="slugify(this)"><div class="hint">loyalapp.com/card?m=<span id="slug-preview" style="color:var(--gold)">your-slug</span></div></div>
+        <div class="field"><label class="label">Business Name</label><input class="input" id="w-name" type="text" placeholder="Neue Car Spa" oninput="autoSlug(this.value)"></div>
+        <div class="field"><label class="label">Slug (URL ID)</label><input class="input" id="w-slug" type="text" placeholder="neue-car-spa" oninput="slugify(this);checkSlug()"><div class="hint" id="slug-hint"><span id="slug-prefix" style="color:var(--t3)"></span><span id="slug-preview" style="color:var(--gold)">your-slug</span></div><div id="slug-status" style="font-size:11px;margin-top:4px;min-height:16px"></div></div>
       </div>
     </div>
     <div class="card">
@@ -567,9 +568,12 @@ async function signIn(){
 async function signUp(){
   const email=$('su-email').value.trim(),pass=$('su-pass').value;
   if(!email||!pass){toast('Fill in all fields');return;}
+  if(pass.length<8){toast('Password must be at least 8 characters');return;}
   const btn=$('signup-btn');btn.disabled=true;btn.textContent='Creating...';
-  const{error}=await db.auth.signUp({email,password:pass});
-  if(error){toast(error.message);}else{toast('Account created! You can now log in.');toggleSignup();}
+  const{data,error}=await db.auth.signUp({email,password:pass});
+  if(error){toast(error.message);}
+  else if(data.user&&!data.session){$('signup-notice').style.display='block';toast('Check your email to confirm');}
+  else{toast('Account created!');toggleSignup();}
   btn.disabled=false;btn.innerHTML='<i class="ti ti-user-plus"></i> Create Account';
 }
 
@@ -580,12 +584,33 @@ async function loadMerchant(){
   if(!S.user)return;
   const res=await fetch(API+'/api/merchant/by-auth/'+S.user.id);
   const data=await res.json();
-  if(!data){S.merchant=null;show('setup');return;}
+  if(!data){S.merchant=null;$('slug-prefix').textContent=location.origin+'/card?m=';show('setup');return;}
   S.merchant=data;
   showDashboard();
 }
 
-function slugify(el){el.value=el.value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');$('slug-preview').textContent=el.value||'your-slug';}
+var _slugTimer=null,_slugManual=false;
+function slugify(el){el.value=el.value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');$('slug-preview').textContent=el.value||'your-slug';_slugManual=true;}
+function autoSlug(name){
+  if(_slugManual&&$('w-slug').value)return;
+  var s=name.trim().toLowerCase().replace(/[^a-z0-9\s]+/g,'').replace(/\s+/g,'-').replace(/^-|-$/g,'');
+  $('w-slug').value=s;$('slug-preview').textContent=s||'your-slug';_slugManual=false;checkSlug();
+}
+function checkSlug(){
+  clearTimeout(_slugTimer);
+  var s=$('w-slug').value.trim();
+  var el=$('slug-status');
+  if(!s||s.length<2){el.innerHTML='';return;}
+  el.innerHTML='<span style="color:var(--t3)">Checking...</span>';
+  _slugTimer=setTimeout(async function(){
+    try{
+      var r=await fetch(API+'/api/slug-check/'+encodeURIComponent(s));
+      var d=await r.json();
+      if(d.available)el.innerHTML='<span style="color:#1EA06E"><i class="ti ti-circle-check"></i> Available</span>';
+      else el.innerHTML='<span style="color:#E24B4A"><i class="ti ti-alert-circle"></i> Already taken — try another</span>';
+    }catch(e){el.innerHTML='';}
+  },400);
+}
 function setColor(hex,el){$('w-color').value=hex;document.querySelectorAll('.color-opt').forEach(c=>c.classList.remove('on'));el.classList.add('on');}
 function addSvc(){const val=$('svc-input').value.trim();if(!val||S.services.includes(val))return;S.services.push(val);$('svc-input').value='';renderSvcTags();}
 function removeSvc(s){S.services=S.services.filter(x=>x!==s);renderSvcTags();}
@@ -594,8 +619,10 @@ function renderSvcTags(){$('svc-tags').innerHTML=S.services.map(s=>'<span class=
 async function doSetup(){
   const name=$('w-name').value.trim(),slug=$('w-slug').value.trim();
   if(!name||!slug){toast('Business name and slug are required');return;}
+  if(slug.length<2){toast('Slug must be at least 2 characters');return;}
   if(!S.services.length){toast('Add at least one service');return;}
   const btn=$('setup-btn');btn.disabled=true;btn.textContent='Creating...';
+  try{const ck=await fetch(API+'/api/slug-check/'+encodeURIComponent(slug)).then(r=>r.json());if(!ck.available){toast('Slug "'+slug+'" is already taken');btn.disabled=false;btn.innerHTML='<i class="ti ti-rocket"></i> Launch My Loyalty Program';return;}}catch(e){}
   const res=await fetch(API+'/api/merchant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,slug,email:S.user.email,authId:S.user.id,brandColor:$('w-color').value,logoText:$('w-logo').value.trim()||name.substring(0,6).toUpperCase(),stampsPerCard:parseInt($('w-stamps').value),rewardName:$('w-reward').value.trim()||'Free Item',rewardValue:$('w-reward-val').value.trim(),services:S.services})});
   const data=await res.json();
   if(!res.ok){toast(data.error||'Error');btn.disabled=false;btn.innerHTML='<i class="ti ti-rocket"></i> Launch My Loyalty Program';return;}

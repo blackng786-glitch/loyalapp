@@ -212,6 +212,14 @@ app.post('/api/merchant', async (req, res) => {
   res.json(data);
 });
 
+// ── SLUG AVAILABILITY CHECK ──────────────────────────────────
+app.get('/api/slug-check/:slug', async (req, res) => {
+  const slug = req.params.slug.toLowerCase().replace(/[^a-z0-9-]/g, '');
+  if (slug.length < 2) return res.json({ available: false, reason: 'too_short' });
+  const { data } = await db.from('merchants').select('id').eq('slug', slug).maybeSingle();
+  res.json({ available: !data, slug });
+});
+
 // ── UPDATE MERCHANT SETTINGS ──────────────────────────────────
 app.patch('/api/merchant/:id', async (req, res) => {
   const m = await requireMerchant(req, res, req.params.id);
