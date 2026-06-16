@@ -174,6 +174,23 @@ create index idx_voucher_member    on public.vouchers(member_id);
 create index idx_voucher_merchant  on public.vouchers(merchant_id);
 create index idx_vtx_voucher      on public.voucher_transactions(voucher_id);
 
+-- 13. SECURITY EVENTS (intrusion detection log)
+create table public.security_events (
+  id          uuid primary key default gen_random_uuid(),
+  event_type  text not null,
+  severity    text not null default 'info'
+              check (severity in ('info','warn','critical')),
+  ip          text,
+  merchant_id uuid references public.merchants(id) on delete set null,
+  details     jsonb default '{}',
+  created_at  timestamptz not null default now()
+);
+
+create index idx_sec_events_type     on public.security_events(event_type);
+create index idx_sec_events_time     on public.security_events(created_at desc);
+create index idx_sec_events_ip       on public.security_events(ip);
+create index idx_sec_events_merchant on public.security_events(merchant_id);
+
 -- ROW LEVEL SECURITY — 默认拒绝 (deny-by-default)
 -- 不创建任何 policy: anon key 无法读写任何表。
 -- 全部数据操作经 server.js (service key, 绕过 RLS) + 应用层鉴权:
@@ -190,6 +207,7 @@ alter table public.bottle_keeps          enable row level security;
 alter table public.bottle_transactions   enable row level security;
 alter table public.vouchers              enable row level security;
 alter table public.voucher_transactions  enable row level security;
+alter table public.security_events       enable row level security;
 
 -- ================================================================
 -- DEMO SEED DATA (optional — delete before production)

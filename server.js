@@ -164,6 +164,50 @@ setInterval(() => {  // 每小时清理过期 key, 防内存增长
   }
 }, 3600000);
 
+// ── SECURITY EVENT LOGGING ──────────────────────────────────
+function logSec(type, severity, ip, merchantId, details) {
+  db.from('security_events').insert({
+    event_type: type, severity, ip: ip || null,
+    merchant_id: merchantId || null, details: details || {},
+  }).then(() => {}).catch(e => console.error('[sec-log]', e.message));
+  if (severity === 'critical') console.warn(`[SEC-CRITICAL] ${type} ip=${ip}`, JSON.stringify(details));
+}
+
+// ── IP AUTO-BAN (内存, 重启清零) ────────────────────────────
+const banMap = new Map();
+const BAN_THRESHOLD_1 = 10;   // 10 次违规 → 封 1 小时
+const BAN_THRESHOLD_2 = 30;   // 30 次 → 封 24 小时
+const ipStrikes = new Map();
+
+function recordStrike(ip) {
+  const n = (ipStrikes.get(ip) || 0) + 1;
+  ipStrikes.set(ip, n);
+  if (n >= BAN_THRESHOLD_2) {
+    banMap.set(ip, Date.now() + 24 * 3600000);
+    logSec('ip_ban', 'critical', ip, null, { strikes: n, duration: '24h' });
+  } else if (n >= BAN_THRESHOLD_1) {
+    banMap.set(ip, Date.now() + 3600000);
+    logSec('ip_ban', 'warn', ip, null, { strikes: n, duration: '1h' });
+  }
+}
+
+function isBanned(ip) {
+  const until = banMap.get(ip);
+  if (!until) return false;
+  if (Date.now() > until) { banMap.delete(ip); ipStrikes.delete(ip); return false; }
+  return true;
+}
+
+app.use((req, res, next) => {
+  if (isBanned(req.ip)) return res.status(403).json({ error: '访问已被限制' });
+  next();
+});
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, until] of banMap) if (now > until) { banMap.delete(ip); ipStrikes.delete(ip); }
+}, 600000);
+
 // ── WEB PUSH ─────────────────────────────────────────────────
 webpush.setVapidDetails(
   'mailto:' + process.env.CONTACT_EMAIL,
@@ -329,9 +373,9 @@ app.post('/api/auth/send-otp', async (req, res) => {
   const { phone } = req.body;
   if (!phone || phone.length < 8) return res.status(400).json({ error: '请输入有效手机号' });
   // 限流: 防短信轰炸 + 控制 SMS 成本
-  if (!rateOk('otp:p1:' + phone, 60 * 1000, 1))        return res.status(429).json({ error: '发送太频繁，请 1 分钟后再试' });
-  if (!rateOk('otp:pd:' + phone, 24 * 3600 * 1000, 8)) return res.status(429).json({ error: '该号码今日发送次数已达上限' });
-  if (!rateOk('otp:ip:' + req.ip, 3600 * 1000, 15))    return res.status(429).json({ error: '请求过于频繁，请稍后再试' });
+  if (!rateOk('otp:p1:' + phone, 60 * 1000, 1))        { recordStrike(req.ip); logSec('rate_limit', 'warn', req.ip, null, { type: 'otp_send', phone }); return res.status(429).json({ error: '发送太频繁，请 1 分钟后再试' }); }
+  if (!rateOk('otp:pd:' + phone, 24 * 3600 * 1000, 8)) { recordStrike(req.ip); logSec('rate_limit', 'warn', req.ip, null, { type: 'otp_daily', phone }); return res.status(429).json({ error: '该号码今日发送次数已达上限' }); }
+  if (!rateOk('otp:ip:' + req.ip, 3600 * 1000, 15))    { recordStrike(req.ip); logSec('rate_limit', 'critical', req.ip, null, { type: 'otp_ip_flood' }); return res.status(429).json({ error: '请求过于频繁，请稍后再试' }); }
   try {
     const { error } = await authClient.auth.signInWithOtp({ phone });
     if (error) return res.status(400).json({ error: error.message });
@@ -346,10 +390,10 @@ app.post('/api/auth/verify-otp', async (req, res) => {
   const { phone, token, merchantId } = req.body;
   if (!phone || !token) return res.status(400).json({ error: 'phone and token required' });
   // 限流: 6 位验证码防暴力穷举
-  if (!rateOk('otp:vf:' + phone, 3600 * 1000, 10)) return res.status(429).json({ error: '尝试次数过多，请稍后再试' });
+  if (!rateOk('otp:vf:' + phone, 3600 * 1000, 10)) { recordStrike(req.ip); logSec('rate_limit', 'critical', req.ip, null, { type: 'otp_verify_brute', phone }); return res.status(429).json({ error: '尝试次数过多，请稍后再试' }); }
   try {
     const { error } = await authClient.auth.verifyOtp({ phone, token, type: 'sms' });
-    if (error) return res.status(400).json({ error: error.message });
+    if (error) { logSec('otp_fail', 'info', req.ip, null, { phone }); return res.status(400).json({ error: error.message }); }
 
     // 查 members 表找这个 phone 的会员
     let member = null, total_stamps = 0;
@@ -454,11 +498,13 @@ app.get('/api/member/:id/activity', async (req, res) => {
 // ── STAFF LOGIN ───────────────────────────────────────────────
 app.post('/api/staff/login', async (req, res) => {
   const { merchantId, pin } = req.body;
-  if (!rateOk('pin:' + req.ip + ':' + merchantId, 3600 * 1000, 10))
+  if (!rateOk('pin:' + req.ip + ':' + merchantId, 3600 * 1000, 10)) {
+    recordStrike(req.ip); logSec('rate_limit', 'critical', req.ip, merchantId, { type: 'pin_brute' });
     return res.status(429).json({ error: '尝试次数过多，请 1 小时后再试' });
+  }
   const { data } = await db.from('staff').select('*').eq('merchant_id', merchantId);
   const staff = await matchStaffPin(data, pin);
-  if (!staff) return res.status(401).json({ error: 'Incorrect PIN' });
+  if (!staff) { logSec('auth_fail', 'warn', req.ip, merchantId, { type: 'staff_pin' }); recordStrike(req.ip); return res.status(401).json({ error: 'Incorrect PIN' }); }
   const { pin: _, ...safe } = staff;
   res.json(safe);
 });
@@ -856,6 +902,27 @@ app.get('/api/analytics/:merchantId', async (req, res) => {
     branchBreakdown: toPairs(br),
     tierBreakdown: tierCount,
   });
+});
+
+// ── SECURITY EVENTS (商家可查看自己的安全日志) ─────────────────
+app.get('/api/security-events/:merchantId', async (req, res) => {
+  const m = await requireMerchant(req, res, req.params.merchantId);
+  if (!m) return;
+  const days = Math.min(parseInt(req.query.days) || 7, 30);
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+  const { data } = await db.from('security_events')
+    .select('id,event_type,severity,ip,details,created_at')
+    .or(`merchant_id.eq.${req.params.merchantId},merchant_id.is.null`)
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(100);
+  const summary = { total: 0, critical: 0, warn: 0, info: 0, topIps: {} };
+  for (const e of (data || [])) {
+    summary.total++;
+    summary[e.severity] = (summary[e.severity] || 0) + 1;
+    if (e.ip) summary.topIps[e.ip] = (summary.topIps[e.ip] || 0) + 1;
+  }
+  res.json({ events: data || [], summary });
 });
 
 // ── FEATURE TOGGLES (印章/存酒/储值券, 商家) ───────────────────

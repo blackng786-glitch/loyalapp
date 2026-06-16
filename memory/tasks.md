@@ -13,6 +13,7 @@ Last updated: 2026-06-16
 
 ## ✅ Done
 <!-- Newest at top. Format: - [x] task (YYYY-MM-DD) -->
+- [x] Security hardening round 3 — CDN SRI integrity hashes (pinned versions), input length validation (server checkLen + client maxlength), stamp endpoint bcrypt PIN fix (2026-06-16)
 - [x] Security hardening round 2 — helmet headers, CORS restriction, staff PIN bcrypt + random default, race condition fixes (optimistic lock on bottle pour + voucher redeem), server-side redemption stamp validation, PostgREST filter injection whitelist, branches endpoint auth, error message sanitization (safeDbError), XSS fix on logo_url, SW cache bump v4 (2026-06-16)
 - [x] Merchant self-registration improvements — slug auto-generation from business name, real-time availability check, email confirmation notice, password validation, slug validation before submit (2026-06-16)
 - [x] i18n three-language support (中/EN/BM) — ~200 dictionary entries with Malay translations, 3-way toggle button, all card.html JS strings use t(), auto-detect browser locale (2026-06-16)
