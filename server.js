@@ -1,20 +1,32 @@
 require('dotenv').config();
 const express = require('express');
 const cors    = require('cors');
+const helmet  = require('helmet');
+const bcrypt  = require('bcryptjs');
 const webpush = require('web-push');
 const crypto  = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 app.set('trust proxy', 1);                 // Railway 反代后取真实客户端 IP (限流用)
-app.use(cors());
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+app.use(cors({
+  origin: ALLOWED_ORIGINS.length
+    ? (origin, cb) => cb(null, !origin || ALLOWED_ORIGINS.includes(origin))
+    : (origin, cb) => cb(null, !origin || origin === `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` || /^https?:\/\/localhost(:\d+)?$/.test(origin || '')),
+  credentials: true,
+}));
+app.use(helmet({
+  contentSecurityPolicy: false,            // 前端 inline script 需要; XSS 由 esc() 手动防
+  crossOriginEmbedderPolicy: false,        // 允许外部 CDN 资源加载
+}));
 app.use(express.json({ limit: '6mb' }));   // 6mb 以容纳 base64 logo 上传
 app.get('/bottle', (req, res) => { res.redirect(301, '/card' + (req.query.m ? '?m=' + encodeURIComponent(req.query.m) : '')); });
 app.get('/api/health', async (req, res) => {
   try {
     const { data, error } = await db.from('merchants').select('id').limit(1);
-    res.json({ db: error ? 'error' : 'ok', count: data?.length ?? 0, error: error?.message || null });
-  } catch (e) { res.status(500).json({ db: 'crash', error: e.message }); }
+    res.json({ db: error ? 'error' : 'ok', count: data?.length ?? 0 });
+  } catch (e) { console.error('[health]', e.message); res.status(500).json({ db: 'crash' }); }
 });
 app.use(express.static('public'));
 
@@ -32,6 +44,15 @@ const authClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_S
 // HMAC 签名 token (会员登录态 / 注册票据)。密钥优先用环境变量, 否则从 service key 派生。
 const TOKEN_SECRET = process.env.MEMBER_TOKEN_SECRET ||
   crypto.createHash('sha256').update('chopkar-member:' + (process.env.SUPABASE_SERVICE_KEY || '')).digest('hex');
+if (!process.env.MEMBER_TOKEN_SECRET) console.warn('[WARN] MEMBER_TOKEN_SECRET not set — using derived fallback. Set a random 64-char hex string in production.');
+
+function safeDbError(err) {
+  if (err.code === '23505') return '记录已存在';
+  if (err.code === '23503') return '关联数据不存在';
+  if (err.code === '42501') return '权限不足';
+  console.error('[DB]', err.code, err.message);
+  return '操作失败，请重试';
+}
 
 const hmac = p => crypto.createHmac('sha256', TOKEN_SECRET).update(p).digest('base64url');
 function signToken(parts, ttlMs) {
@@ -88,8 +109,18 @@ async function requireMerchantBySlug(req, res, slug) {
 async function getStaff(req, merchantId) {
   const pin = req.headers['x-staff-pin'] || req.body?.staffPin;
   if (!pin || !merchantId) return null;
-  const { data } = await db.from('staff').select('*').eq('merchant_id', merchantId).eq('pin', pin).limit(1);
-  return data?.[0] || null;
+  const { data } = await db.from('staff').select('*').eq('merchant_id', merchantId);
+  return matchStaffPin(data, pin);
+}
+async function matchStaffPin(staffRows, pin) {
+  for (const s of (staffRows || [])) {
+    if (s.pin.startsWith('$2')) { if (await bcrypt.compare(pin, s.pin)) return s; }
+    else if (s.pin === pin) {
+      await db.from('staff').update({ pin: await bcrypt.hash(pin, 10) }).eq('id', s.id);
+      return s;
+    }
+  }
+  return null;
 }
 
 // 员工或商家任一即可 (staff.html 与 dashboard.html 共用的端点)
@@ -205,11 +236,11 @@ app.post('/api/merchant', async (req, res) => {
     reward_value: rewardValue || '',
     services: services || ['Service'],
   }).select().single();
-  if (error) return res.status(400).json({ error: error.message });
-  // Create default staff account + default branch
-  await db.from('staff').insert({ merchant_id: data.id, name: 'Staff', pin: '1234', branch: 'Main Branch' });
+  if (error) return res.status(400).json({ error: safeDbError(error) });
+  const defaultPin = String(Math.floor(100000 + Math.random() * 900000));
+  await db.from('staff').insert({ merchant_id: data.id, name: 'Staff', pin: await bcrypt.hash(defaultPin, 10), branch: 'Main Branch' });
   await db.from('branches').insert({ merchant_id: data.id, name: 'Main Branch' });
-  res.json(data);
+  res.json({ ...data, defaultStaffPin: defaultPin });
 });
 
 // ── SLUG AVAILABILITY CHECK ──────────────────────────────────
@@ -231,7 +262,7 @@ app.patch('/api/merchant/:id', async (req, res) => {
   if (!Object.keys(patch).length) return res.status(400).json({ error: 'nothing to update' });
   const { data, error } = await db.from('merchants')
     .update(patch).eq('id', req.params.id).select().single();
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) return res.status(400).json({ error: safeDbError(error) });
   res.json(data);
 });
 
@@ -246,7 +277,7 @@ app.put('/api/merchant/:slug/branding', async (req, res) => {
   if (bg_color !== undefined) patch.bg_color = bg_color;
   if (!Object.keys(patch).length) return res.status(400).json({ error: 'nothing to update' });
   const { error } = await db.from('merchants').update(patch).eq('slug', req.params.slug);
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) return res.status(400).json({ error: safeDbError(error) });
   res.json({ success: true });
 });
 
@@ -277,7 +308,8 @@ app.post('/api/merchant/:slug/upload-logo', async (req, res) => {
     await db.from('merchants').update({ logo_url: url }).eq('slug', req.params.slug);
     res.json({ url });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[upload]', e.message);
+    res.status(500).json({ error: '上传失败' });
   }
 });
 
@@ -294,7 +326,8 @@ app.post('/api/auth/send-otp', async (req, res) => {
     if (error) return res.status(400).json({ error: error.message });
     res.json({ success: true });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[send-otp]', e.message);
+    res.status(500).json({ error: '服务异常，请稍后再试' });
   }
 });
 
@@ -336,7 +369,8 @@ app.post('/api/auth/verify-otp', async (req, res) => {
       regTicket: member ? null : regTicketFor(phone, merchantId || ''),
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[verify-otp]', e.message);
+    res.status(500).json({ error: '验证服务异常' });
   }
 });
 
@@ -386,7 +420,7 @@ async function registerMember(req, res) {
     .insert({ name, phone, merchant_id: merchantId }).select().single();
   if (error) {
     if (error.code === '23505') return res.status(409).json({ error: 'Phone already registered' });
-    return res.status(400).json({ error: error.message });
+    return res.status(400).json({ error: safeDbError(error) });
   }
   res.json({ ...data, token: memberToken(data.id, merchantId) });
 }
@@ -407,13 +441,13 @@ app.get('/api/member/:id/activity', async (req, res) => {
 // ── STAFF LOGIN ───────────────────────────────────────────────
 app.post('/api/staff/login', async (req, res) => {
   const { merchantId, pin } = req.body;
-  // 限流: 防 4 位 PIN 暴力穷举
   if (!rateOk('pin:' + req.ip + ':' + merchantId, 3600 * 1000, 10))
     return res.status(429).json({ error: '尝试次数过多，请 1 小时后再试' });
-  const { data } = await db.from('staff')
-    .select('*').eq('merchant_id', merchantId).eq('pin', pin).limit(1);
-  if (!data?.length) return res.status(401).json({ error: 'Incorrect PIN' });
-  res.json(data[0]);
+  const { data } = await db.from('staff').select('*').eq('merchant_id', merchantId);
+  const staff = await matchStaffPin(data, pin);
+  if (!staff) return res.status(401).json({ error: 'Incorrect PIN' });
+  const { pin: _, ...safe } = staff;
+  res.json(safe);
 });
 
 // ── SEARCH MEMBERS (staff) ────────────────────────────────────
@@ -422,7 +456,8 @@ app.get('/api/members/search', async (req, res) => {
   const auth = await requireStaffOrMerchant(req, res, merchantId);
   if (!auth) return;
   if (!q?.trim()) return res.json([]);
-  const safe = q.replace(/[,()]/g, ' ');   // 防 PostgREST or-filter 注入
+  const safe = q.replace(/[^a-zA-Z0-9\s一-鿿@+\-]/g, '').trim().slice(0, 50);
+  if (!safe) return res.json([]);
   const { data: members } = await db.from('members').select('*')
     .eq('merchant_id', merchantId)
     .or(`name.ilike.%${safe}%,phone.ilike.%${safe}%`)
@@ -474,7 +509,7 @@ app.post('/api/stamp', async (req, res) => {
     member_id: memberId, merchant_id: merchantId,
     service, branch: branch || staffRows[0].branch, staff_name: staffRows[0].name,
   }).select().single();
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) return res.status(400).json({ error: safeDbError(error) });
 
   // Send push notification (non-blocking)
   notifyMember(memberId, '⭐ Stamp collected!', `You visited ${service}. Keep it up!`).catch(() => {});
@@ -486,10 +521,20 @@ app.post('/api/redeem', async (req, res) => {
   const { memberId, merchantId, rewardName } = req.body;
   const mt = getMember(req);
   if (!mt || mt.memberId !== memberId) return res.status(401).json({ error: '未授权' });
+  const [merchantR, stampsR, redeemedR] = await Promise.all([
+    db.from('merchants').select('stamps_per_card').eq('id', merchantId).maybeSingle(),
+    db.from('stamps').select('*', { count: 'exact', head: true }).eq('member_id', memberId).eq('merchant_id', merchantId),
+    db.from('redemptions').select('*', { count: 'exact', head: true }).eq('member_id', memberId).eq('merchant_id', merchantId),
+  ]);
+  const goal = merchantR.data?.stamps_per_card || 10;
+  const totalStamps = stampsR.count || 0;
+  const totalRedeemed = redeemedR.count || 0;
+  const available = totalStamps - (totalRedeemed * goal);
+  if (available < goal) return res.status(400).json({ error: '印章不足，无法兑换' });
   const { data, error } = await db.from('redemptions')
     .insert({ member_id: memberId, merchant_id: merchantId, reward_name: rewardName })
     .select().single();
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) return res.status(400).json({ error: safeDbError(error) });
   res.json(data);
 });
 
@@ -528,10 +573,12 @@ app.get('/api/staff/:merchantId', async (req, res) => {
 
 app.post('/api/staff', async (req, res) => {
   const { merchantId, name, pin, branch } = req.body;
+  if (!pin || pin.length < 4) return res.status(400).json({ error: 'PIN must be at least 4 digits' });
   const m = await requireMerchant(req, res, merchantId);
   if (!m) return;
-  const { data, error } = await db.from('staff').insert({ merchant_id: merchantId, name, pin, branch }).select().single();
-  if (error) return res.status(400).json({ error: error.message });
+  const hashed = await bcrypt.hash(pin, 10);
+  const { data, error } = await db.from('staff').insert({ merchant_id: merchantId, name, pin: hashed, branch }).select().single();
+  if (error) return res.status(400).json({ error: safeDbError(error) });
   res.json(data);
 });
 
@@ -540,12 +587,15 @@ app.patch('/api/staff/:id', async (req, res) => {
   if (!st) return res.status(404).json({ error: 'staff not found' });
   const m = await requireMerchant(req, res, st.merchant_id);
   if (!m) return;
-  // 字段白名单
   const patch = {};
   for (const k of ['name', 'pin', 'branch']) if (req.body[k] !== undefined) patch[k] = req.body[k];
   if (!Object.keys(patch).length) return res.status(400).json({ error: 'nothing to update' });
+  if (patch.pin) {
+    if (patch.pin.length < 4) return res.status(400).json({ error: 'PIN must be at least 4 digits' });
+    patch.pin = await bcrypt.hash(patch.pin, 10);
+  }
   const { data, error } = await db.from('staff').update(patch).eq('id', req.params.id).select().single();
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) return res.status(400).json({ error: safeDbError(error) });
   res.json(data);
 });
 
@@ -578,7 +628,7 @@ app.post('/api/push/schedule', async (req, res) => {
   const { data, error } = await db.from('scheduled_pushes')
     .insert({ merchant_id: merchantId, title, body, scheduled_at: scheduledAt })
     .select().single();
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) return res.status(400).json({ error: safeDbError(error) });
   res.json(data);
 });
 
@@ -600,7 +650,7 @@ app.delete('/api/push/scheduled/:id', async (req, res) => {
   if (!m) return;
   const { error } = await db.from('scheduled_pushes')
     .update({ status: 'cancelled' }).eq('id', req.params.id).eq('status', 'pending');
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) return res.status(400).json({ error: safeDbError(error) });
   res.json({ ok: true });
 });
 
@@ -685,6 +735,8 @@ setInterval(processScheduledPushes, 60 * 1000);
 
 // ── BRANCHES (多门店管理) ─────────────────────────────────────
 app.get('/api/branches/:merchantId', async (req, res) => {
+  const auth = await requireStaffOrMerchant(req, res, req.params.merchantId);
+  if (!auth) return;
   const { data } = await db.from('branches')
     .select('*').eq('merchant_id', req.params.merchantId)
     .order('created_at', { ascending: true });
@@ -700,7 +752,7 @@ app.post('/api/branches', async (req, res) => {
     .insert({ merchant_id: merchantId, name: name.trim() }).select().single();
   if (error) {
     if (error.code === '23505') return res.status(409).json({ error: 'Branch already exists' });
-    return res.status(400).json({ error: error.message });
+    return res.status(400).json({ error: safeDbError(error) });
   }
   res.json(data);
 });
@@ -711,7 +763,7 @@ app.delete('/api/branches/:id', async (req, res) => {
   const m = await requireMerchant(req, res, br.merchant_id);
   if (!m) return;
   const { error } = await db.from('branches').delete().eq('id', req.params.id);
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) return res.status(400).json({ error: safeDbError(error) });
   res.json({ ok: true });
 });
 
@@ -794,7 +846,7 @@ app.put('/api/merchant/:slug/features', async (req, res) => {
   if (feature_voucher !== undefined) patch.feature_voucher = !!feature_voucher;
   if (!Object.keys(patch).length) return res.status(400).json({ error: 'nothing to update' });
   const { error } = await db.from('merchants').update(patch).eq('slug', req.params.slug);
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) return res.status(400).json({ error: safeDbError(error) });
   res.json({ success: true });
 });
 
@@ -822,7 +874,7 @@ app.post('/api/bottles', async (req, res) => {
     member_id: memberId, merchant_id: merchantId, brand, size_ml: size, remaining_ml: size,
     photo_url: photo_url || null, expires_at: expires_at || null,
   }).select().single();
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) return res.status(400).json({ error: safeDbError(error) });
   await db.from('bottle_transactions').insert({ bottle_keep_id: data.id, type: 'deposit', amount_ml: size, note: '登记存酒' });
   res.json({ success: true, bottle: data });
 });
@@ -837,8 +889,12 @@ app.post('/api/bottles/:id/pour', async (req, res) => {
   if (!staff) return res.status(401).json({ error: '未授权' });
   if (b.remaining_ml < amt) return res.status(400).json({ error: '剩余酒量不足' });
   const remaining = b.remaining_ml - amt;
-  const { error } = await db.from('bottle_keeps').update({ remaining_ml: remaining }).eq('id', req.params.id);
-  if (error) return res.status(400).json({ error: error.message });
+  const { data: updated, error } = await db.from('bottle_keeps')
+    .update({ remaining_ml: remaining })
+    .eq('id', req.params.id).eq('remaining_ml', b.remaining_ml)
+    .select('remaining_ml');
+  if (error) return res.status(400).json({ error: safeDbError(error) });
+  if (!updated?.length) return res.status(409).json({ error: '操作冲突，请重试' });
   await db.from('bottle_transactions').insert({ bottle_keep_id: req.params.id, type: 'pour', amount_ml: amt, note: note || null, staff_id: staffId || null });
   res.json({ success: true, remaining_ml: remaining });
 });
@@ -888,7 +944,7 @@ app.post('/api/vouchers', async (req, res) => {
     member_id: memberId, merchant_id: merchantId, type: type || 'session', label: label || null,
     total: tot, remaining: tot, expires_at: expires_at || null,
   }).select().single();
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) return res.status(400).json({ error: safeDbError(error) });
   await db.from('voucher_transactions').insert({ voucher_id: data.id, type: 'issue', amount: tot, note: '发券' });
   res.json({ success: true, voucher: data });
 });
@@ -903,8 +959,12 @@ app.post('/api/vouchers/:id/redeem', async (req, res) => {
   if (!staff) return res.status(401).json({ error: '未授权' });
   if (v.remaining < amt) return res.status(400).json({ error: '余额不足' });
   const remaining = v.remaining - amt;
-  const { error } = await db.from('vouchers').update({ remaining }).eq('id', req.params.id);
-  if (error) return res.status(400).json({ error: error.message });
+  const { data: updated, error } = await db.from('vouchers')
+    .update({ remaining })
+    .eq('id', req.params.id).eq('remaining', v.remaining)
+    .select('remaining');
+  if (error) return res.status(400).json({ error: safeDbError(error) });
+  if (!updated?.length) return res.status(409).json({ error: '操作冲突，请重试' });
   await db.from('voucher_transactions').insert({ voucher_id: req.params.id, type: 'redeem', amount: amt, note: note || null, staff_id: staffId || null });
   res.json({ success: true, remaining });
 });

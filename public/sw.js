@@ -1,4 +1,4 @@
-const CACHE = 'chopkar-v3';   // bump: bottle merge into card + OTP auth fix
+const CACHE = 'chopkar-v4';   // bump: security hardening
 const ASSETS = ['/card', '/staff', '/icons/icon-192.png'];
 
 self.addEventListener('install', e => {

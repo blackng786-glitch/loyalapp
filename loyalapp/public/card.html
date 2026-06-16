@@ -527,10 +527,10 @@ function applyBranding(m){
   document.title=m.name+' · ChopKar';
   ['otp-brand','nn-brand','mem-brand'].forEach(id=>{const el=$(id);if(el)el.textContent=logo;});
   const hl=$('hero-logo');
-  if(hl){if(m.logo_url)hl.innerHTML='<img class="merchant-logo-img" src="'+m.logo_url+'" alt="logo">';else hl.textContent=logo;}
+  if(hl){if(m.logo_url)hl.innerHTML='<img class="merchant-logo-img" src="'+esc(m.logo_url)+'" alt="logo">';else hl.textContent=logo;}
   $('hero-name').textContent=m.name;
   const mcb=$('mc-brand');
-  if(mcb){if(m.logo_url)mcb.innerHTML='<img class="merchant-logo-img" style="max-height:22px" src="'+m.logo_url+'" alt="logo">';else mcb.textContent=m.name.toUpperCase();}
+  if(mcb){if(m.logo_url)mcb.innerHTML='<img class="merchant-logo-img" style="max-height:22px" src="'+esc(m.logo_url)+'" alt="logo">';else mcb.textContent=m.name.toUpperCase();}
   $('s-note').textContent=m.stamps_per_card+' '+t('stamps')+' = '+m.reward_name+(m.reward_value?' ('+m.reward_value+')':'');
 }
 
