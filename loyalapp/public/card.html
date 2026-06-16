@@ -531,7 +531,7 @@ function applyBranding(m){
   $('hero-name').textContent=m.name;
   const mcb=$('mc-brand');
   if(mcb){if(m.logo_url)mcb.innerHTML='<img class="merchant-logo-img" style="max-height:22px" src="'+m.logo_url+'" alt="logo">';else mcb.textContent=m.name.toUpperCase();}
-  $('s-note').textContent=m.stamps_per_card+' stamps = '+m.reward_name+(m.reward_value?' ('+m.reward_value+')':'');
+  $('s-note').textContent=m.stamps_per_card+' '+t('stamps')+' = '+m.reward_name+(m.reward_value?' ('+m.reward_value+')':'');
 }
 
 function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));$('v-'+id).classList.add('on');}
@@ -541,31 +541,31 @@ function logout(){clearSession();S.member=null;S.token=null;show('landing');}
 async function sendOtp(){
   const phone=getPhone('cc-select','ph-in');
   $('otp-send-err').textContent='';
-  if(!phone||phone.length<8){$('otp-send-err').textContent='请输入有效手机号';return;}
-  const btn=$('otp-send-btn');btn.disabled=true;btn.innerHTML='<i class="ti ti-loader-2" style="animation:sp 1s linear infinite"></i> 发送中...';
+  if(!phone||phone.length<8){$('otp-send-err').textContent=t('请输入有效手机号');return;}
+  const btn=$('otp-send-btn');btn.disabled=true;btn.innerHTML='<i class="ti ti-loader-2" style="animation:sp 1s linear infinite"></i> '+t('发送中...');
   try{
     const res=await fetch(API+'/api/auth/send-otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})});
     const data=await res.json();
-    if(!res.ok){$('otp-send-err').textContent=data.error||'发送失败';return;}
+    if(!res.ok){$('otp-send-err').textContent=data.error||t('发送失败');return;}
     S.otpPhone=phone;
     $('otp-phone-lbl').textContent=phone;
     clearOtpInputs();
     show('otp');
     $('otp-0').focus();
     startCountdown();
-  }catch(e){$('otp-send-err').textContent='网络错误';}
-  finally{btn.disabled=false;btn.innerHTML='<i class="ti ti-message"></i> 获取验证码';}
+  }catch(e){$('otp-send-err').textContent=t('网络错误');}
+  finally{btn.disabled=false;btn.innerHTML='<i class="ti ti-message"></i> '+t('获取验证码');}
 }
 
 async function verifyOtp(){
   const code=getOtpCode();
   $('otp-err').textContent='';
-  if(code.length<6){$('otp-err').textContent='请输入完整 6 位验证码';return;}
-  const btn=$('otp-verify-btn');btn.disabled=true;btn.innerHTML='<i class="ti ti-loader-2" style="animation:sp 1s linear infinite"></i> 验证中...';
+  if(code.length<6){$('otp-err').textContent=t('请输入完整 6 位验证码');return;}
+  const btn=$('otp-verify-btn');btn.disabled=true;btn.innerHTML='<i class="ti ti-loader-2" style="animation:sp 1s linear infinite"></i> '+t('验证中...');
   try{
     const res=await fetch(API+'/api/auth/verify-otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:S.otpPhone,token:code,merchantId:S.merchant.id})});
     const data=await res.json();
-    if(!res.ok){$('otp-err').textContent=data.error||'验证失败';btn.disabled=false;btn.innerHTML='<i class="ti ti-shield-check"></i> 验证';return;}
+    if(!res.ok){$('otp-err').textContent=data.error||t('验证失败');btn.disabled=false;btn.innerHTML='<i class="ti ti-shield-check"></i> '+t('验证');return;}
     if(data.isNew){
       // 新会员: 保存注册票据, 输入姓名
       S.regTicket=data.regTicket;
@@ -573,22 +573,22 @@ async function verifyOtp(){
     }
     // 老会员: 用服务端签发的 token 登录
     await loginWithMember(data.member,data.token);
-  }catch(e){$('otp-err').textContent='网络错误';btn.disabled=false;btn.innerHTML='<i class="ti ti-shield-check"></i> 验证';}
+  }catch(e){$('otp-err').textContent=t('网络错误');btn.disabled=false;btn.innerHTML='<i class="ti ti-shield-check"></i> '+t('验证');}
 }
 
 async function completeRegistration(){
   const name=$('nn-name').value.trim();
   $('nn-err').textContent='';
-  if(!name){$('nn-err').textContent='请输入姓名';return;}
-  const btn=$('nn-btn');btn.disabled=true;btn.textContent='注册中...';
+  if(!name){$('nn-err').textContent=t('请输入姓名');return;}
+  const btn=$('nn-btn');btn.disabled=true;btn.textContent=t('注册中...');
   try{
     const res=await fetch(API+'/api/member',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,phone:S.otpPhone,merchantId:S.merchant.id,regTicket:S.regTicket})});
     const data=await res.json();
-    if(!res.ok){$('nn-err').textContent=data.error||'注册失败';return;}
+    if(!res.ok){$('nn-err').textContent=data.error||t('注册失败');return;}
     await loginWithMember(data,data.token);
     toast('Welcome, '+name.split(' ')[0]+'!');
-  }catch(e){$('nn-err').textContent='网络错误';}
-  finally{btn.disabled=false;btn.innerHTML='<i class="ti ti-check"></i> 完成注册';}
+  }catch(e){$('nn-err').textContent=t('网络错误');}
+  finally{btn.disabled=false;btn.innerHTML='<i class="ti ti-check"></i> '+t('完成注册');}
 }
 
 async function loginWithMember(member,token){
@@ -605,9 +605,9 @@ async function resendOtp(){
   try{
     const res=await fetch(API+'/api/auth/send-otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:S.otpPhone})});
     const data=await res.json();
-    if(!res.ok){$('otp-err').textContent=data.error||'发送失败';btn.disabled=false;return;}
-    clearOtpInputs();$('otp-0').focus();startCountdown();toast('验证码已重新发送');
-  }catch(e){$('otp-err').textContent='网络错误';btn.disabled=false;}
+    if(!res.ok){$('otp-err').textContent=data.error||t('发送失败');btn.disabled=false;return;}
+    clearOtpInputs();$('otp-0').focus();startCountdown();toast(t('验证码已重新发送'));
+  }catch(e){$('otp-err').textContent=t('网络错误');btn.disabled=false;}
 }
 
 // OTP 输入框自动跳格
@@ -641,7 +641,7 @@ function startCountdown(){
   clearCountdown();let sec=60;
   const btn=$('resend-btn'),lbl=$('cd-sec');
   btn.disabled=true;lbl.textContent=sec;
-  cdTimer=setInterval(()=>{sec--;lbl.textContent=sec;if(sec<=0){clearCountdown();btn.disabled=false;btn.textContent='重新发送验证码';}},1000);
+  cdTimer=setInterval(()=>{sec--;lbl.textContent=sec;if(sec<=0){clearCountdown();btn.disabled=false;btn.textContent=t('重新发送验证码');}},1000);
 }
 function clearCountdown(){if(cdTimer){clearInterval(cdTimer);cdTimer=null;}}
 
@@ -675,13 +675,13 @@ function renderMemberView(){
 function renderRewards(m,total,pts,free){
   const rr=[{name:m.reward_name,desc:(m.reward_value||'')+' - Complete a stamp card',icon:'ti-gift',ok:free>0,label:free>0?free+' available':'Complete a card first'},{name:'Loyalty Voucher',desc:'100 pts - Special reward',icon:'ti-ticket',ok:pts>=100,label:pts+' / 100 pts'},{name:'VIP Reward',desc:'300 pts - Exclusive benefit',icon:'ti-crown',ok:pts>=300,label:pts+' / 300 pts'}];
   const wrap=$('rewards-wrap');wrap.innerHTML='';
-  rr.forEach(r=>{const d=mk('div');d.className='reward'+(r.ok?' on':'');d.innerHTML='<div class="rw-ico '+(r.ok?'open':'lock')+'"><i class="ti '+r.icon+'" aria-hidden="true"></i></div><div class="rw-body"><div class="rw-name">'+esc(r.name)+'</div><div class="rw-desc">'+esc(r.desc)+'</div><div class="rw-req">'+r.label+'</div></div><button class="btn-rw" '+(r.ok?'':'disabled')+' onclick="openRedeem(\''+esc(r.name)+'\')">'+(r.ok?'Redeem':'Locked')+'</button>';wrap.appendChild(d);});
+  rr.forEach(r=>{const d=mk('div');d.className='reward'+(r.ok?' on':'');d.innerHTML='<div class="rw-ico '+(r.ok?'open':'lock')+'"><i class="ti '+r.icon+'" aria-hidden="true"></i></div><div class="rw-body"><div class="rw-name">'+esc(r.name)+'</div><div class="rw-desc">'+esc(r.desc)+'</div><div class="rw-req">'+r.label+'</div></div><button class="btn-rw" '+(r.ok?'':'disabled')+' onclick="openRedeem(\''+esc(r.name)+'\')">'+(r.ok?t('Redeem'):t('Locked'))+'</button>';wrap.appendChild(d);});
 }
 
 function renderHistory(){
   const all=[...S.stamps.map(s=>({type:'s',title:s.service,meta:s.branch,date:s.created_at,val:'+10 pts'})),...S.redemptions.map(r=>({type:'r',title:r.reward_name,meta:'Redeemed',date:r.created_at,val:'Used'}))].sort((a,b)=>new Date(b.date)-new Date(a.date));
   const wrap=$('history-wrap');
-  if(!all.length){wrap.innerHTML='<div class="empty"><i class="ti ti-history" aria-hidden="true"></i><p>No activity yet. Visit us to earn your first stamp!</p></div>';return;}
+  if(!all.length){wrap.innerHTML='<div class="empty"><i class="ti ti-history" aria-hidden="true"></i><p>'+t('No activity yet. Visit us to earn your first stamp!')+'</p></div>';return;}
   wrap.innerHTML=all.map(e=>'<div class="h-item"><div class="h-dot '+e.type+'"></div><div class="h-info"><div class="h-ttl">'+esc(e.title)+'</div><div class="h-meta">'+esc(e.meta)+' - '+fmtDate(e.date)+'</div></div><div class="h-val '+(e.type==='s'?'p':'m')+'">'+e.val+'</div></div>').join('');
 }
 
@@ -694,19 +694,19 @@ function renderQR(){
 function renderPushSection(){
   const sec=$('push-section');
   if(!('Notification' in window)||Notification.permission==='granted'){sec.innerHTML='';return;}
-  sec.innerHTML='<div class="push-card"><i class="ti ti-bell" aria-hidden="true"></i><div class="push-body"><div class="push-title">Enable notifications</div><div class="push-sub">Get notified when stamps are added and rewards are ready</div></div><button class="btn-rw" onclick="setupPush()">Enable</button></div>';
+  sec.innerHTML='<div class="push-card"><i class="ti ti-bell" aria-hidden="true"></i><div class="push-body"><div class="push-title">'+t('Enable notifications')+'</div><div class="push-sub">'+t('Get notified when stamps are added and rewards are ready')+'</div></div><button class="btn-rw" onclick="setupPush()">'+t('Enable')+'</button></div>';
 }
 
 async function setupPush(){
   try{
     const perm=await Notification.requestPermission();
-    if(perm!=='granted'){toast('Notifications blocked');return;}
+    if(perm!=='granted'){toast(t('Notifications blocked'));return;}
     const reg=await navigator.serviceWorker.ready;
     const {key}=await fetch(API+'/api/vapid-key').then(r=>r.json());
     const sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64(key)});
     await fetch(API+'/api/push/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({memberId:S.member.id,subscription:sub})});
-    renderPushSection();toast('Notifications enabled!');
-  }catch(e){toast('Could not enable notifications');}
+    renderPushSection();toast(t('Notifications enabled!'));
+  }catch(e){toast(t('Could not enable notifications'));}
 }
 
 function mTab(id){
@@ -714,15 +714,15 @@ function mTab(id){
   document.querySelectorAll('#v-member .pane').forEach(p=>p.classList.toggle('on',p.id==='tp-'+id));
 }
 
-function openRedeem(name){S.pendingRedeem=name;$('redeem-modal-sub').textContent='Redeem: '+name;$('redeem-modal').classList.add('on');}
+function openRedeem(name){S.pendingRedeem=name;$('redeem-modal-sub').textContent=t('Redeem')+': '+name;$('redeem-modal').classList.add('on');}
 
 async function confirmRedeem(){
   closeOverlay('redeem-modal');
   const res=await fetch(API+'/api/redeem',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({memberId:S.member.id,merchantId:S.merchant.id,rewardName:S.pendingRedeem})});
   if(res.ok){
     try{const ar=await fetch(API+'/api/member/'+S.member.id+'/activity');const ad=await ar.json();S.stamps=ad.stamps||[];S.redemptions=ad.redemptions||[];}catch(e){}
-    renderMemberView();toast('Redeemed! Show to staff.');
-  }else toast('Error - please try again');
+    renderMemberView();toast(t('Redeemed! Show to staff.'));
+  }else toast(t('Error - please try again'));
 }
 
 function closeOverlay(id){$(id).classList.remove('on');}
@@ -749,28 +749,28 @@ async function loadBottleData(){
       $('vouchers-section').style.display='block';
       renderVouchers(vouchers||[]);
     }
-  }catch(e){toast('加载存酒失败');}
+  }catch(e){toast(t('加载存酒失败'));}
 }
 
 function renderBottles(list){
   const wrap=$('bottles-wrap');
-  if(!list.length){wrap.innerHTML='<div class="empty"><i class="ti ti-bottle-off" aria-hidden="true"></i><p>暂无存酒<br>请联系吧台登记</p></div>';return;}
+  if(!list.length){wrap.innerHTML='<div class="empty"><i class="ti ti-bottle-off" aria-hidden="true"></i><p>'+t('暂无存酒')+'<br>'+t('请联系吧台登记')+'</p></div>';return;}
   wrap.innerHTML=list.map(b=>{
     const pct=Math.max(0,Math.min(100,Math.round(b.remaining_ml/b.size_ml*100)));
     const col=progColor(pct);
     const d=daysLeft(b.expires_at);
     let exp='';
     if(d!==null){
-      if(d<0)exp='<div class="b-exp warn">已过期</div>';
-      else if(d<=7)exp='<div class="b-exp warn">'+d+' 天后到期</div>';
-      else exp='<div class="b-exp">'+d+' 天后到期</div>';
+      if(d<0)exp='<div class="b-exp warn">'+t('已过期')+'</div>';
+      else if(d<=7)exp='<div class="b-exp warn">'+d+' '+t('days left','天后到期')+'</div>';
+      else exp='<div class="b-exp">'+d+' '+t('days left','天后到期')+'</div>';
     }
     const photo=b.photo_url?'<img class="b-photo" src="'+esc(b.photo_url)+'" alt="">':'';
     return '<div class="bottle">'
       +'<div class="b-top"><div><div class="b-brand">'+esc(b.brand)+'</div>'+exp+'</div>'+photo+'</div>'
       +'<div class="prog"><div class="prog-fill" style="width:'+pct+'%;background:'+col+'"></div></div>'
-      +'<div class="b-amt"><span>剩余 <b>'+b.remaining_ml+'ml</b></span><span>总 '+b.size_ml+'ml · '+pct+'%</span></div>'
-      +'<div class="b-foot"><button class="tx-btn" onclick="toggleTx(\''+b.id+'\')"><i class="ti ti-history" aria-hidden="true"></i> 流水</button></div>'
+      +'<div class="b-amt"><span>'+t('剩余')+' <b>'+b.remaining_ml+'ml</b></span><span>'+t('总')+' '+b.size_ml+'ml · '+pct+'%</span></div>'
+      +'<div class="b-foot"><button class="tx-btn" onclick="toggleTx(\''+b.id+'\')"><i class="ti ti-history" aria-hidden="true"></i> '+t('流水')+'</button></div>'
       +'<div class="tx-list" id="tx-'+b.id+'"></div>'
       +'</div>';
   }).join('');
@@ -779,27 +779,27 @@ function renderBottles(list){
 async function toggleTx(id){
   const box=$('tx-'+id);
   if(box.classList.contains('on')){box.classList.remove('on');return;}
-  box.classList.add('on');box.innerHTML='<div class="tx-item"><span>加载中...</span></div>';
+  box.classList.add('on');box.innerHTML='<div class="tx-item"><span>'+t('加载中...')+'</span></div>';
   const tx=await fetch(API+'/api/bottles/'+id+'/transactions').then(r=>r.json()).catch(()=>[]);
-  const pours=(tx||[]).filter(t=>t.type==='pour'||t.type==='deposit').slice(0,5);
-  if(!pours.length){box.innerHTML='<div class="tx-item"><span>暂无记录</span></div>';return;}
-  box.innerHTML=pours.map(t=>{
-    const sign=t.type==='deposit'?'+':'-';
-    const label=t.type==='deposit'?'存入':'倒酒';
-    return '<div class="tx-item"><span>'+label+' '+sign+t.amount_ml+'ml</span><span>'+fmtDate(t.created_at)+'</span></div>';
+  const pours=(tx||[]).filter(x=>x.type==='pour'||x.type==='deposit').slice(0,5);
+  if(!pours.length){box.innerHTML='<div class="tx-item"><span>'+t('暂无记录')+'</span></div>';return;}
+  box.innerHTML=pours.map(x=>{
+    const sign=x.type==='deposit'?'+':'-';
+    const label=x.type==='deposit'?t('存入'):t('倒酒');
+    return '<div class="tx-item"><span>'+label+' '+sign+x.amount_ml+'ml</span><span>'+fmtDate(x.created_at)+'</span></div>';
   }).join('');
 }
 
 function renderVouchers(list){
   const wrap=$('vouchers-wrap');
-  if(!list.length){wrap.innerHTML='<div class="empty"><i class="ti ti-ticket-off" aria-hidden="true"></i><p>暂无储值券</p></div>';return;}
+  if(!list.length){wrap.innerHTML='<div class="empty"><i class="ti ti-ticket-off" aria-hidden="true"></i><p>'+t('暂无储值券')+'</p></div>';return;}
   wrap.innerHTML=list.map(v=>{
-    const unit=v.type==='session'?'次':'';
+    const unit=v.type==='session'?t('次数'):'';
     const d=daysLeft(v.expires_at);
-    const exp=d!==null?('<div class="v-meta">'+(d<0?'已过期':d+' 天后到期')+'</div>'):'';
+    const exp=d!==null?('<div class="v-meta">'+(d<0?t('已过期'):d+' '+t('days left'))+'</div>'):'';
     return '<div class="voucher"><div class="v-ico"><i class="ti ti-ticket" aria-hidden="true"></i></div>'
-      +'<div class="v-body"><div class="v-label">'+esc(v.label||(v.type==='session'?'次卡':'储值卡'))+'</div>'+exp+'</div>'
-      +'<div class="v-rem"><div class="v-rem-val">'+(+v.remaining)+'</div><div class="v-rem-lbl">剩余'+unit+'</div></div></div>';
+      +'<div class="v-body"><div class="v-label">'+esc(v.label||(v.type==='session'?t('次卡(按次)'):t('储值(按金额)')))+'</div>'+exp+'</div>'
+      +'<div class="v-rem"><div class="v-rem-val">'+(+v.remaining)+'</div><div class="v-rem-lbl">'+t('剩余')+unit+'</div></div></div>';
   }).join('');
 }
 
