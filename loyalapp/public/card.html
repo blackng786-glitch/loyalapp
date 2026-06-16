@@ -12,9 +12,9 @@
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 <title>ChopKar</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.44.0/dist/tabler-icons.min.css" integrity="sha384-ccZHbezhtZWmNy0cg8odL0D/jFU5k5HIls9y78Qd6lWor7rpvFIZtK0fTFG4z456" crossorigin="anonymous">
 <script src="/i18n.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU" crossorigin="anonymous"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{--brand:#D85A30;--brand-r:216;--brand-g:90;--brand-b:48;--bg:#1B1917;--s1:#221F1D;--s2:#2A2624;--s3:#332E2B;--b1:#2A2624;--b2:#36302C;--b3:#463E38;--t1:#F1ECE6;--t2:#A39C94;--t3:#6E665E;--r:12px;--rs:8px;
@@ -299,7 +299,7 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
     <div class="form-stack">
       <div>
         <label class="label" for="nn-name">Your Name 姓名</label>
-        <input class="input" id="nn-name" type="text" placeholder="Ahmad bin Abdullah" autocomplete="name" style="font-size:16px">
+        <input class="input" id="nn-name" type="text" placeholder="Ahmad bin Abdullah" autocomplete="name" maxlength="100" style="font-size:16px">
       </div>
       <div id="nn-err" class="err-text"></div>
       <button class="btn btn-brand" id="nn-btn" onclick="completeRegistration()">

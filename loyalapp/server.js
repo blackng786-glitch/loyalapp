@@ -40,6 +40,15 @@ const authClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_S
   auth: { autoRefreshToken: false, persistSession: false }
 });
 
+// ── INPUT VALIDATION ────────────────────────────────────────
+const LIMITS = { name: 100, phone: 20, slug: 50, color: 10, logoText: 20, reward: 100, service: 50, pin: 20, branch: 100, title: 200, body: 1000, brand: 100, label: 100, email: 254 };
+function checkLen(fields) {
+  for (const [val, max, label] of fields) {
+    if (val && typeof val === 'string' && val.length > max) return `${label} 不能超过 ${max} 字符`;
+  }
+  return null;
+}
+
 // ── AUTH HELPERS ─────────────────────────────────────────────
 // HMAC 签名 token (会员登录态 / 注册票据)。密钥优先用环境变量, 否则从 service key 派生。
 const TOKEN_SECRET = process.env.MEMBER_TOKEN_SECRET ||
@@ -225,6 +234,8 @@ app.post('/api/merchant', async (req, res) => {
   const user = await getAuthUser(req);
   if (!user) return res.status(401).json({ error: '请先登录' });
   const { name, slug, email, brandColor, logoText, stampsPerCard, rewardName, rewardValue, services } = req.body;
+  const lenErr = checkLen([[name, LIMITS.name, '商家名'], [slug, LIMITS.slug, 'Slug'], [email, LIMITS.email, 'Email'], [logoText, LIMITS.logoText, 'Logo'], [rewardName, LIMITS.reward, '奖励名'], [rewardValue, LIMITS.reward, '奖励值']]);
+  if (lenErr) return res.status(400).json({ error: lenErr });
   const { data, error } = await db.from('merchants').insert({
     name, slug,
     email: user.email || email,
@@ -413,6 +424,8 @@ app.get('/api/member/:phone', async (req, res) => {
 // ── REGISTER MEMBER (必须持有 OTP 验证后签发的注册票据) ─────────
 async function registerMember(req, res) {
   const { name, phone, merchantId, regTicket } = req.body;
+  const lenErr = checkLen([[name, LIMITS.name, '姓名'], [phone, LIMITS.phone, '手机号']]);
+  if (lenErr) return res.status(400).json({ error: lenErr });
   const ticket = verifyToken(regTicket);
   if (!ticket || ticket.t !== 'reg' || ticket.phone !== phone || (ticket.merchantId && ticket.merchantId !== merchantId))
     return res.status(401).json({ error: '请先完成手机验证' });
@@ -501,13 +514,15 @@ app.get('/api/members/all', async (req, res) => {
 // ── ADD STAMP ────────────────────────────────────────────────
 app.post('/api/stamp', async (req, res) => {
   const { memberId, merchantId, service, staffPin, branch } = req.body;
-  const { data: staffRows } = await db.from('staff')
-    .select('*').eq('merchant_id', merchantId).eq('pin', staffPin).limit(1);
-  if (!staffRows?.length) return res.status(401).json({ error: 'Invalid PIN' });
+  const lenErr = checkLen([[service, LIMITS.service, '服务'], [branch, LIMITS.branch, '分店']]);
+  if (lenErr) return res.status(400).json({ error: lenErr });
+  const { data: allStaff } = await db.from('staff').select('*').eq('merchant_id', merchantId);
+  const staff = await matchStaffPin(allStaff, staffPin);
+  if (!staff) return res.status(401).json({ error: 'Invalid PIN' });
 
   const { data, error } = await db.from('stamps').insert({
     member_id: memberId, merchant_id: merchantId,
-    service, branch: branch || staffRows[0].branch, staff_name: staffRows[0].name,
+    service, branch: branch || staff.branch, staff_name: staff.name,
   }).select().single();
   if (error) return res.status(400).json({ error: safeDbError(error) });
 
@@ -574,6 +589,8 @@ app.get('/api/staff/:merchantId', async (req, res) => {
 app.post('/api/staff', async (req, res) => {
   const { merchantId, name, pin, branch } = req.body;
   if (!pin || pin.length < 4) return res.status(400).json({ error: 'PIN must be at least 4 digits' });
+  const lenErr = checkLen([[name, LIMITS.name, '姓名'], [pin, LIMITS.pin, 'PIN'], [branch, LIMITS.branch, '分店']]);
+  if (lenErr) return res.status(400).json({ error: lenErr });
   const m = await requireMerchant(req, res, merchantId);
   if (!m) return;
   const hashed = await bcrypt.hash(pin, 10);
@@ -612,6 +629,8 @@ app.post('/api/push/subscribe', async (req, res) => {
 // ── BROADCAST PUSH NOTIFICATION (商家) ────────────────────────
 app.post('/api/push/broadcast', async (req, res) => {
   const { merchantId, title, body } = req.body;
+  const lenErr = checkLen([[title, LIMITS.title, '标题'], [body, LIMITS.body, '内容']]);
+  if (lenErr) return res.status(400).json({ error: lenErr });
   const m = await requireMerchant(req, res, merchantId);
   if (!m) return;
   const sent = await broadcastToMembers(merchantId, title, body);
@@ -623,6 +642,8 @@ app.post('/api/push/schedule', async (req, res) => {
   const { merchantId, title, body, scheduledAt } = req.body;
   if (!merchantId || !title || !body || !scheduledAt)
     return res.status(400).json({ error: 'merchantId, title, body, scheduledAt required' });
+  const lenErr = checkLen([[title, LIMITS.title, '标题'], [body, LIMITS.body, '内容']]);
+  if (lenErr) return res.status(400).json({ error: lenErr });
   const m = await requireMerchant(req, res, merchantId);
   if (!m) return;
   const { data, error } = await db.from('scheduled_pushes')
@@ -746,6 +767,8 @@ app.get('/api/branches/:merchantId', async (req, res) => {
 app.post('/api/branches', async (req, res) => {
   const { merchantId, name } = req.body;
   if (!merchantId || !name?.trim()) return res.status(400).json({ error: 'merchantId and name required' });
+  const lenErr = checkLen([[name, LIMITS.branch, '分店名']]);
+  if (lenErr) return res.status(400).json({ error: lenErr });
   const m = await requireMerchant(req, res, merchantId);
   if (!m) return;
   const { data, error } = await db.from('branches')
@@ -867,6 +890,8 @@ app.get('/api/bottles', async (req, res) => {
 app.post('/api/bottles', async (req, res) => {
   const { memberId, merchantId, brand, size_ml, photo_url, expires_at } = req.body;
   if (!memberId || !merchantId || !brand || !size_ml) return res.status(400).json({ error: 'memberId, merchantId, brand, size_ml required' });
+  const lenErr = checkLen([[brand, LIMITS.brand, '品牌']]);
+  if (lenErr) return res.status(400).json({ error: lenErr });
   const staff = await getStaff(req, merchantId);
   if (!staff) return res.status(401).json({ error: '未授权' });
   const size = parseInt(size_ml);
@@ -937,6 +962,8 @@ app.get('/api/vouchers', async (req, res) => {
 app.post('/api/vouchers', async (req, res) => {
   const { memberId, merchantId, type, label, total, expires_at } = req.body;
   if (!memberId || !merchantId || total == null) return res.status(400).json({ error: 'memberId, merchantId, total required' });
+  const lenErr = checkLen([[label, LIMITS.label, '标签']]);
+  if (lenErr) return res.status(400).json({ error: lenErr });
   const staff = await getStaff(req, merchantId);
   if (!staff) return res.status(401).json({ error: '未授权' });
   const tot = Number(total);

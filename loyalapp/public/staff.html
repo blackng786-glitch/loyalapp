@@ -7,9 +7,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>ChopKar Staff</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.44.0/dist/tabler-icons.min.css" integrity="sha384-ccZHbezhtZWmNy0cg8odL0D/jFU5k5HIls9y78Qd6lWor7rpvFIZtK0fTFG4z456" crossorigin="anonymous">
 <script src="/i18n.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" integrity="sha384-b5Ya4Bq3qCyz39m2ISh+4DxjAIljdeFwK/BsXLuj9gugaNwAcj/ia15fxNZL9Nlx" crossorigin="anonymous"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{--brand:#D85A30;--brand-r:216;--brand-g:90;--brand-b:48;--bg:#1B1917;--s1:#221F1D;--s2:#2A2624;--s3:#332E2B;--b1:#2A2624;--b2:#36302C;--b3:#463E38;--t1:#F1ECE6;--t2:#A39C94;--t3:#6E665E;--r:12px;--rs:8px;
@@ -210,7 +210,7 @@ canvas#scan-canvas{display:none}
       <div class="search-row">
         <div class="search-box">
           <i class="ti ti-search ico" aria-hidden="true"></i>
-          <input class="search-input" id="s-search" type="text" placeholder="Search name or phone..." oninput="onSearch(this.value)" autocomplete="off">
+          <input class="search-input" id="s-search" type="text" placeholder="Search name or phone..." maxlength="50" oninput="onSearch(this.value)" autocomplete="off">
         </div>
         <button class="scan-btn" onclick="openScanner()">
           <i class="ti ti-scan" aria-hidden="true"></i> Scan QR
@@ -240,7 +240,7 @@ canvas#scan-canvas{display:none}
     <div class="search-wrap">
       <div class="search-box">
         <i class="ti ti-search ico" aria-hidden="true"></i>
-        <input class="search-input" id="b-search" type="text" placeholder="搜索会员姓名或手机..." oninput="bSearch(this.value)" autocomplete="off">
+        <input class="search-input" id="b-search" type="text" placeholder="搜索会员姓名或手机..." maxlength="50" oninput="bSearch(this.value)" autocomplete="off">
       </div>
     </div>
     <div class="results" id="b-results"></div>

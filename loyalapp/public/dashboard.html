@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ChopKar - Merchant Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.44.0/dist/tabler-icons.min.css" integrity="sha384-ccZHbezhtZWmNy0cg8odL0D/jFU5k5HIls9y78Qd6lWor7rpvFIZtK0fTFG4z456" crossorigin="anonymous">
 <script src="/i18n.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.108.2/dist/umd/supabase.min.js" integrity="sha384-JWEyvHh+lRf0sN/WWY+QTQwX+CyWqmNg4tkc8GQzAMEtR2wGNrCJlvnu1lHD1kDm" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--gold:#D85A30;--bg:#1B1917;--s1:#221F1D;--s2:#2A2624;--s3:#332E2B;--b1:#2A2624;--b2:#36302C;--b3:#463E38;--t1:#F1ECE6;--t2:#A39C94;--t3:#6E665E;--r:12px;--rs:8px;--green:#4A9E6A;--ck-primary:#993C1D;--ck-accent:#D85A30;--ck-light:#FAECE7;--ck-muted:#888780;--ck-surface:#F7F5F3;}
@@ -193,13 +193,13 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
         <div style="font-size:13px;color:var(--t3);margin-top:4px">Sign in to manage your loyalty program</div>
       </div>
       <div id="auth-form" style="display:flex;flex-direction:column;gap:12px">
-        <div><label class="label" for="auth-email">Email</label><input class="input" id="auth-email" type="email" placeholder="you@business.com" autocomplete="email"></div>
+        <div><label class="label" for="auth-email">Email</label><input class="input" id="auth-email" type="email" placeholder="you@business.com" maxlength="254" autocomplete="email"></div>
         <div><label class="label" for="auth-pass">Password</label><input class="input" id="auth-pass" type="password" placeholder="Password" autocomplete="current-password"></div>
         <button class="btn btn-gold" id="signin-btn" onclick="signIn()" style="margin-top:4px"><i class="ti ti-arrow-right" aria-hidden="true"></i> Sign In</button>
         <div style="text-align:center"><button style="background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;text-decoration:underline" onclick="toggleSignup()">New merchant? Create account</button></div>
       </div>
       <div id="signup-form" style="display:none;flex-direction:column;gap:12px">
-        <div><label class="label" for="su-email">Email</label><input class="input" id="su-email" type="email" placeholder="you@business.com"></div>
+        <div><label class="label" for="su-email">Email</label><input class="input" id="su-email" type="email" placeholder="you@business.com" maxlength="254"></div>
         <div><label class="label" for="su-pass">Password</label><input class="input" id="su-pass" type="password" placeholder="Min. 8 characters"></div>
         <button class="btn btn-gold" id="signup-btn" onclick="signUp()"><i class="ti ti-user-plus" aria-hidden="true"></i> Create Account</button>
         <div id="signup-notice" style="display:none;background:rgba(30,160,110,0.12);border:1px solid rgba(30,160,110,0.3);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--t2);text-align:center;line-height:1.6"><i class="ti ti-mail-check" style="color:#1EA06E;font-size:18px;vertical-align:middle;margin-right:4px"></i> Check your email to confirm your account, then sign in below.</div>
@@ -219,8 +219,8 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
       <div class="card-title"><i class="ti ti-building-store" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>Business Info</div>
       <div class="card-sub">Basic details about your business</div>
       <div class="two-col">
-        <div class="field"><label class="label">Business Name</label><input class="input" id="w-name" type="text" placeholder="Neue Car Spa" oninput="autoSlug(this.value)"></div>
-        <div class="field"><label class="label">Slug (URL ID)</label><input class="input" id="w-slug" type="text" placeholder="neue-car-spa" oninput="slugify(this);checkSlug()"><div class="hint" id="slug-hint"><span id="slug-prefix" style="color:var(--t3)"></span><span id="slug-preview" style="color:var(--gold)">your-slug</span></div><div id="slug-status" style="font-size:11px;margin-top:4px;min-height:16px"></div></div>
+        <div class="field"><label class="label">Business Name</label><input class="input" id="w-name" type="text" placeholder="Neue Car Spa" maxlength="100" oninput="autoSlug(this.value)"></div>
+        <div class="field"><label class="label">Slug (URL ID)</label><input class="input" id="w-slug" type="text" placeholder="neue-car-spa" maxlength="50" oninput="slugify(this);checkSlug()"><div class="hint" id="slug-hint"><span id="slug-prefix" style="color:var(--t3)"></span><span id="slug-preview" style="color:var(--gold)">your-slug</span></div><div id="slug-status" style="font-size:11px;margin-top:4px;min-height:16px"></div></div>
       </div>
     </div>
     <div class="card">
@@ -245,15 +245,15 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
       <div class="card-sub">Configure how customers earn rewards</div>
       <div class="two-col">
         <div class="field"><label class="label">Stamps per card</label><select class="input" id="w-stamps"><option value="5">5 stamps</option><option value="8">8 stamps</option><option value="10" selected>10 stamps</option><option value="12">12 stamps</option></select></div>
-        <div class="field"><label class="label">Reward Name</label><input class="input" id="w-reward" type="text" placeholder="Free Basic Wash"></div>
+        <div class="field"><label class="label">Reward Name</label><input class="input" id="w-reward" type="text" placeholder="Free Basic Wash" maxlength="100"></div>
       </div>
-      <div class="field"><label class="label">Reward Value (optional)</label><input class="input" id="w-reward-val" type="text" placeholder="RM35 value"></div>
+      <div class="field"><label class="label">Reward Value (optional)</label><input class="input" id="w-reward-val" type="text" placeholder="RM35 value" maxlength="100"></div>
     </div>
     <div class="card">
       <div class="card-title"><i class="ti ti-list" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>Services</div>
       <div class="card-sub">Services your staff can select when stamping</div>
       <div style="display:flex;gap:8px;margin-bottom:10px">
-        <input class="input" id="svc-input" type="text" placeholder="e.g. Basic Wash (RM35)" style="flex:1" onkeydown="if(event.key==='Enter')addSvc()">
+        <input class="input" id="svc-input" type="text" placeholder="e.g. Basic Wash (RM35)" maxlength="50" style="flex:1" onkeydown="if(event.key==='Enter')addSvc()">
         <button class="btn btn-outline btn-sm" onclick="addSvc()" style="white-space:nowrap"><i class="ti ti-plus" aria-hidden="true"></i> Add</button>
       </div>
       <div class="svc-tags" id="svc-tags"></div>
@@ -261,7 +261,7 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
     <div class="card">
       <div class="card-title"><i class="ti ti-lock" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>Staff PIN</div>
       <div class="card-sub">Your staff use this PIN to log into the stamp panel</div>
-      <div class="field"><label class="label">Staff PIN (4 digits)</label><input class="input" id="w-pin" type="tel" placeholder="1234" maxlength="4" inputmode="numeric" style="max-width:140px"><div class="hint">You can add more staff accounts later</div></div>
+      <div class="field"><label class="label">Staff PIN (4+ digits)</label><input class="input" id="w-pin" type="tel" placeholder="1234" maxlength="20" inputmode="numeric" style="max-width:160px"><div class="hint">You can add more staff accounts later</div></div>
     </div>
     <button class="btn btn-gold" id="setup-btn" onclick="doSetup()"><i class="ti ti-rocket" aria-hidden="true"></i> Launch My Loyalty Program</button>
   </div>
@@ -382,8 +382,8 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
         <button id="pm-schedule" onclick="setPushMode('schedule')"><i class="ti ti-clock" aria-hidden="true"></i> Schedule</button>
         <button id="pm-winback" onclick="setPushMode('winback')"><i class="ti ti-heart-handshake" aria-hidden="true"></i> Win-Back</button>
       </div>
-      <div class="field"><label class="label">Title</label><input class="input" id="push-title" type="text" placeholder="Weekend Promo!" oninput="updatePreview()"></div>
-      <div class="field"><label class="label">Message</label><input class="input" id="push-body" type="text" placeholder="Get 20% off all services this Saturday" oninput="updatePreview()"></div>
+      <div class="field"><label class="label">Title</label><input class="input" id="push-title" type="text" placeholder="Weekend Promo!" maxlength="200" oninput="updatePreview()"></div>
+      <div class="field"><label class="label">Message</label><input class="input" id="push-body" type="text" placeholder="Get 20% off all services this Saturday" maxlength="1000" oninput="updatePreview()"></div>
       <div class="field" id="schedule-field" style="display:none"><label class="label">Send At</label><input class="input" id="push-when" type="datetime-local"></div>
       <div class="field" id="winback-field" style="display:none"><label class="label">Target customers inactive for</label>
         <select class="input" id="push-days" style="max-width:200px"><option value="7">7+ days</option><option value="14" selected>14+ days</option><option value="30">30+ days</option><option value="60">60+ days</option></select>
@@ -413,7 +413,7 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
       <div class="card-title"><i class="ti ti-building-store" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>Branches / Locations</div>
       <div class="card-sub">Add your outlets — staff pick a branch at login and analytics can be filtered per location</div>
       <div style="display:flex;gap:8px;margin-bottom:4px">
-        <input class="input" id="branch-input" type="text" placeholder="e.g. Downtown Branch" style="flex:1" onkeydown="if(event.key==='Enter')addBranch()">
+        <input class="input" id="branch-input" type="text" placeholder="e.g. Downtown Branch" maxlength="100" style="flex:1" onkeydown="if(event.key==='Enter')addBranch()">
         <button class="btn btn-outline btn-sm" onclick="addBranch()" style="white-space:nowrap"><i class="ti ti-plus" aria-hidden="true"></i> Add</button>
       </div>
       <div class="branch-chips" id="branch-chips"></div>
@@ -474,7 +474,7 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
             </div>
             <div class="hint">PNG / JPG，建议 &lt; 1MB</div>
           </div>
-          <div class="field"><label class="label">Staff PIN</label><input class="input" id="set-pin" type="tel" placeholder="New PIN" maxlength="4" inputmode="numeric" style="max-width:160px"></div>
+          <div class="field"><label class="label">Staff PIN</label><input class="input" id="set-pin" type="tel" placeholder="New PIN" maxlength="20" inputmode="numeric" style="max-width:160px"></div>
           <button class="btn btn-gold btn-sm" type="button" style="width:auto" onclick="saveBranding()"><i class="ti ti-check" aria-hidden="true"></i> 保存品牌设置</button>
           <div style="font-size:11px;color:var(--ck-muted);margin-top:10px"><i class="ti ti-info-circle" aria-hidden="true"></i> ChopKar 平台界面颜色不受此影响</div>
         </div>
