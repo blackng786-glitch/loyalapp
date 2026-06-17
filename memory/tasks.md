@@ -3,7 +3,7 @@
 > Single source of truth for progress. Items under "Done" are complete and
 > verified — do not re-investigate them unless something downstream breaks.
 
-Last updated: 2026-06-16
+Last updated: 2026-06-17
 
 ## 🔵 In Progress
 - [ ] (nothing yet)
@@ -13,6 +13,7 @@ Last updated: 2026-06-16
 
 ## ✅ Done
 <!-- Newest at top. Format: - [x] task (YYYY-MM-DD) -->
+- [x] Intrusion detection system — security_events table (migration-v7), logSec() audit trail, IP auto-ban (10→1hr/30→24hr), recordStrike on OTP/PIN failures, security events API endpoint, ban check middleware (2026-06-17)
 - [x] Security hardening round 3 — CDN SRI integrity hashes (pinned versions), input length validation (server checkLen + client maxlength), stamp endpoint bcrypt PIN fix (2026-06-16)
 - [x] Security hardening round 2 — helmet headers, CORS restriction, staff PIN bcrypt + random default, race condition fixes (optimistic lock on bottle pour + voucher redeem), server-side redemption stamp validation, PostgREST filter injection whitelist, branches endpoint auth, error message sanitization (safeDbError), XSS fix on logo_url, SW cache bump v4 (2026-06-16)
 - [x] Merchant self-registration improvements — slug auto-generation from business name, real-time availability check, email confirmation notice, password validation, slug validation before submit (2026-06-16)
