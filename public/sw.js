@@ -1,4 +1,4 @@
-const CACHE = 'chopkar-v4';   // bump: security hardening
+const CACHE = 'chopkar-v5';
 const ASSETS = ['/card', '/staff', '/icons/icon-192.png'];
 
 self.addEventListener('install', e => {

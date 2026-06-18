@@ -3,16 +3,20 @@
 > Single source of truth for progress. Items under "Done" are complete and
 > verified — do not re-investigate them unless something downstream breaks.
 
-Last updated: 2026-06-17
+Last updated: 2026-06-18
 
 ## 🔵 In Progress
 - [ ] (nothing yet)
 
 ## 📋 To Do
-- [ ] (nothing yet)
+- [ ] VAPID keys 配置到 Railway 环境变量 (需要用户手动操作)
+- [ ] 隐私政策 / 用户条款页面
+- [ ] 商家忘记密码流程
 
 ## ✅ Done
 <!-- Newest at top. Format: - [x] task (YYYY-MM-DD) -->
+- [x] PWA 图标生成 (192x192 + 512x512) + VAPID keys 生成 + SW cache bump v5 (2026-06-18)
+- [x] Security monitor dashboard panel — severity stats, top suspicious IPs, event log table with time range filter, all-clear state (2026-06-17)
 - [x] Intrusion detection system — security_events table (migration-v7), logSec() audit trail, IP auto-ban (10→1hr/30→24hr), recordStrike on OTP/PIN failures, security events API endpoint, ban check middleware (2026-06-17)
 - [x] Security hardening round 3 — CDN SRI integrity hashes (pinned versions), input length validation (server checkLen + client maxlength), stamp endpoint bcrypt PIN fix (2026-06-16)
 - [x] Security hardening round 2 — helmet headers, CORS restriction, staff PIN bcrypt + random default, race condition fixes (optimistic lock on bottle pour + voucher redeem), server-side redemption stamp validation, PostgREST filter injection whitelist, branches endpoint auth, error message sanitization (safeDbError), XSS fix on logo_url, SW cache bump v4 (2026-06-16)
