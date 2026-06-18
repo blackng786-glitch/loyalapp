@@ -197,6 +197,20 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
         <div><label class="label" for="auth-pass">Password</label><input class="input" id="auth-pass" type="password" placeholder="Password" autocomplete="current-password"></div>
         <button class="btn btn-gold" id="signin-btn" onclick="signIn()" style="margin-top:4px"><i class="ti ti-arrow-right" aria-hidden="true"></i> Sign In</button>
         <div style="text-align:center"><button style="background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;text-decoration:underline" onclick="toggleSignup()">New merchant? Create account</button></div>
+        <div style="text-align:center"><button style="background:none;border:none;color:var(--t3);font-size:12px;cursor:pointer" onclick="showForgot()">Forgot password?</button></div>
+      </div>
+      <div id="forgot-form" style="display:none;flex-direction:column;gap:12px">
+        <div style="font-size:14px;color:var(--t2);text-align:center;line-height:1.5">Enter your email and we'll send a password reset link.</div>
+        <div><label class="label" for="forgot-email">Email</label><input class="input" id="forgot-email" type="email" placeholder="you@business.com" maxlength="254" autocomplete="email"></div>
+        <button class="btn btn-gold" id="forgot-btn" onclick="sendReset()"><i class="ti ti-mail-forward" aria-hidden="true"></i> Send Reset Link</button>
+        <div id="forgot-notice" style="display:none;background:rgba(30,160,110,0.12);border:1px solid rgba(30,160,110,0.3);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--t2);text-align:center;line-height:1.6"><i class="ti ti-mail-check" style="color:#1EA06E;font-size:18px;vertical-align:middle;margin-right:4px"></i> Reset link sent! Check your email inbox.</div>
+        <div style="text-align:center"><button style="background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;text-decoration:underline" onclick="showLogin()">Back to sign in</button></div>
+      </div>
+      <div id="reset-form" style="display:none;flex-direction:column;gap:12px">
+        <div style="font-size:14px;color:var(--t2);text-align:center;line-height:1.5">Enter your new password.</div>
+        <div><label class="label" for="reset-pass">New Password</label><input class="input" id="reset-pass" type="password" placeholder="Min. 8 characters" autocomplete="new-password"></div>
+        <div><label class="label" for="reset-pass2">Confirm Password</label><input class="input" id="reset-pass2" type="password" placeholder="Re-enter password" autocomplete="new-password"></div>
+        <button class="btn btn-gold" id="reset-btn" onclick="resetPassword()"><i class="ti ti-lock-check" aria-hidden="true"></i> Update Password</button>
       </div>
       <div id="signup-form" style="display:none;flex-direction:column;gap:12px">
         <div><label class="label" for="su-email">Email</label><input class="input" id="su-email" type="email" placeholder="you@business.com" maxlength="254"></div>
@@ -558,7 +572,10 @@ async function init(){
   const {data:{session}}=await db.auth.getSession();
   if(session){S.user=session.user;await loadMerchant();}
   else show('auth');
-  db.auth.onAuthStateChange((_,sess)=>{if(sess){S.user=sess.user;loadMerchant();}});
+  db.auth.onAuthStateChange((ev,sess)=>{
+    if(ev==='PASSWORD_RECOVERY'){show('auth');$('auth-form').style.display='none';$('signup-form').style.display='none';$('forgot-form').style.display='none';$('reset-form').style.display='flex';return;}
+    if(sess){S.user=sess.user;loadMerchant();}
+  });
   setupInstall();
 }
 
@@ -605,7 +622,30 @@ async function signUp(){
 }
 
 async function signOut(){try{await db.auth.signOut();}catch(e){} location.reload();}
-function toggleSignup(){const a=$('auth-form'),b=$('signup-form');a.style.display=a.style.display==='none'?'flex':'none';b.style.display=b.style.display==='none'?'flex':'none';}
+function toggleSignup(){const a=$('auth-form'),b=$('signup-form');a.style.display=a.style.display==='none'?'flex':'none';b.style.display=b.style.display==='none'?'flex':'none';$('forgot-form').style.display='none';}
+function showForgot(){$('auth-form').style.display='none';$('signup-form').style.display='none';$('forgot-form').style.display='flex';$('forgot-notice').style.display='none';$('forgot-email').value=$('auth-email').value;}
+function showLogin(){$('auth-form').style.display='flex';$('signup-form').style.display='none';$('forgot-form').style.display='none';$('reset-form').style.display='none';}
+async function sendReset(){
+  const email=$('forgot-email').value.trim();
+  if(!email){toast('Please enter your email');return;}
+  const btn=$('forgot-btn');btn.disabled=true;btn.textContent='Sending...';
+  const redir=location.origin+'/dashboard';
+  const{error}=await db.auth.resetPasswordForEmail(email,{redirectTo:redir});
+  if(error){toast(error.message);}
+  else{$('forgot-notice').style.display='block';}
+  btn.disabled=false;btn.innerHTML='<i class="ti ti-mail-forward"></i> Send Reset Link';
+}
+async function resetPassword(){
+  const p1=$('reset-pass').value,p2=$('reset-pass2').value;
+  if(!p1||!p2){toast('Please fill in both fields');return;}
+  if(p1!==p2){toast('Passwords do not match');return;}
+  if(p1.length<8){toast('Password must be at least 8 characters');return;}
+  const btn=$('reset-btn');btn.disabled=true;btn.textContent='Updating...';
+  const{error}=await db.auth.updateUser({password:p1});
+  if(error){toast(error.message);}
+  else{toast('Password updated!');showLogin();}
+  btn.disabled=false;btn.innerHTML='<i class="ti ti-lock-check"></i> Update Password';
+}
 
 async function loadMerchant(){
   if(!S.user)return;
