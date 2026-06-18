@@ -10,11 +10,12 @@ Last updated: 2026-06-18
 
 ## 📋 To Do
 - [ ] VAPID keys 配置到 Railway 环境变量 (需要用户手动操作)
-- [ ] 隐私政策 / 用户条款页面
+
 - [ ] 商家忘记密码流程
 
 ## ✅ Done
 <!-- Newest at top. Format: - [x] task (YYYY-MM-DD) -->
+- [x] 隐私政策 + 用户条款页面 (/privacy, /terms), card/staff/dashboard 页脚链接 (2026-06-18)
 - [x] PWA 图标生成 (192x192 + 512x512) + VAPID keys 生成 + SW cache bump v5 (2026-06-18)
 - [x] Security monitor dashboard panel — severity stats, top suspicious IPs, event log table with time range filter, all-clear state (2026-06-17)
 - [x] Intrusion detection system — security_events table (migration-v7), logSec() audit trail, IP auto-ban (10→1hr/30→24hr), recordStrike on OTP/PIN failures, security events API endpoint, ban check middleware (2026-06-17)

@@ -1078,6 +1078,8 @@ app.get('/card', (req, res) => res.sendFile('card.html', { root: 'public' }));
 app.get('/staff', (req, res) => res.sendFile('staff.html', { root: 'public' }));
 app.get('/dashboard', (req, res) => res.sendFile('dashboard.html', { root: 'public' }));
 app.get('/bottle', (req, res) => res.sendFile('bottle.html', { root: 'public' }));
+app.get('/privacy', (req, res) => res.sendFile('privacy.html', { root: 'public' }));
+app.get('/terms', (req, res) => res.sendFile('terms.html', { root: 'public' }));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`LoyalApp running on port ${PORT}`));
