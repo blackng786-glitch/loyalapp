@@ -64,7 +64,7 @@ const SUPA_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
 ## Step 5 — Your first merchant (Neue Car Spa)
 
-1. Go to `https://your-app.railway.app/dashboard`
+1. Go to `https://choppkar.com/dashboard`
 2. Create account with your email
 3. Fill in the setup wizard:
    - Business Name: `Neue Car Spa`
@@ -78,7 +78,7 @@ const SUPA_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
 ## How customers use it
 
-Share this link: `https://your-app.railway.app/card?m=neue-car-spa`
+Share this link: `https://choppkar.com/card?m=neue-car-spa`
 
 On Android: Opens in Chrome → banner appears "Add to Home Screen" → installs as PWA
 On iPhone: Open in Safari → Share → Add to Home Screen → installs as PWA
@@ -87,7 +87,7 @@ On iPhone: Open in Safari → Share → Add to Home Screen → installs as PWA
 
 ## How staff uses it
 
-Share this link: `https://your-app.railway.app/staff?m=neue-car-spa`
+Share this link: `https://choppkar.com/staff?m=neue-car-spa`
 
 Staff enters PIN → searches member by name/phone → taps "Add Stamp" → done.
 

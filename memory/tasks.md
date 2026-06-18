@@ -68,7 +68,7 @@ Last updated: 2026-06-18
 - (nothing)
 
 ## 📝 Notes
-- Production URL: https://loyalapp-production.up.railway.app
+- Production URL: https://choppkar.com (custom domain) / https://loyalapp-production.up.railway.app (Railway)
 - User instruction: 不要自己执行 git push (do NOT auto-push; user may grant one-off exceptions explicitly)
 - Railway deploys from GitHub main branch (Nixpacks)
 - Supabase project: https://hrwoejdyjxpohdvfzcga.supabase.co
