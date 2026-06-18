@@ -1,4 +1,4 @@
-# LoyalApp — Setup Guide
+# Choppkar — Setup Guide
 
 ## What you have
 - `schema.sql` — Database setup (run in Supabase)
@@ -48,7 +48,7 @@ VAPID_PRIVATE_KEY=xxx...
 CONTACT_EMAIL=your@email.com
 ```
 
-5. Railway auto-deploys. Copy your app URL (e.g. `https://loyalapp.up.railway.app`)
+5. Railway auto-deploys. Copy your app URL (e.g. `https://choppkar.up.railway.app`)
 
 ---
 

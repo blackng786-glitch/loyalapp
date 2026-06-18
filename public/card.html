@@ -10,7 +10,7 @@
 <meta id="meta-theme" name="theme-color" content="#1A1A1A">
 <link id="pwa-manifest" rel="manifest">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
-<title>ChopKar</title>
+<title>Choppkar</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.44.0/dist/tabler-icons.min.css" integrity="sha384-ccZHbezhtZWmNy0cg8odL0D/jFU5k5HIls9y78Qd6lWor7rpvFIZtK0fTFG4z456" crossorigin="anonymous">
 <script src="/i18n.js"></script>
@@ -152,7 +152,7 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
 .s-grid{gap:10px}
 .stamp{width:100%;aspect-ratio:1;border-radius:50%;border:1.5px solid var(--b3);display:flex;align-items:center;justify-content:center;transition:all .3s}
 @media(max-width:360px){.hero-logo{font-size:44px}}
-/* ChopKar 平台品牌层 */
+/* Choppkar 平台品牌层 */
 .ck-top{display:flex;justify-content:flex-end;padding:14px 2px 0}
 .ck-mark{font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:2px;color:var(--t2);opacity:.9}
 .ck-mark b{color:var(--ck-accent);font-weight:400}
@@ -254,7 +254,7 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
       </button>
       <p style="font-size:11px;color:var(--t3);text-align:center;margin-top:2px">新老会员均可直接登录</p>
     </div>
-    <div class="ck-footer">Powered by <b>ChopKar</b><br><a href="/privacy" style="color:var(--t3);font-size:10px">Privacy</a> · <a href="/terms" style="color:var(--t3);font-size:10px">Terms</a></div>
+    <div class="ck-footer">Powered by <b>Choppkar</b><br><a href="/privacy" style="color:var(--t3);font-size:10px">Privacy</a> · <a href="/terms" style="color:var(--t3);font-size:10px">Terms</a></div>
   </div>
 </div>
 
@@ -434,14 +434,14 @@ const SESSION_DAYS=30;
 function saveSession(member,token){
   const session={memberId:member.id,phone:member.phone,name:member.name,token:token||S.token,expiresAt:Date.now()+SESSION_DAYS*86400000};
   try{
-    localStorage.setItem('chopkar_'+S.slug+'_session',JSON.stringify(session));
-    localStorage.setItem('chopkar_'+S.slug+'_memberId',member.id);
-    localStorage.setItem('chopkar_'+S.slug+'_member',JSON.stringify(member));
+    localStorage.setItem('choppkar_'+S.slug+'_session',JSON.stringify(session));
+    localStorage.setItem('choppkar_'+S.slug+'_memberId',member.id);
+    localStorage.setItem('choppkar_'+S.slug+'_member',JSON.stringify(member));
   }catch(e){}
 }
 function getSession(){
   try{
-    const raw=localStorage.getItem('chopkar_'+S.slug+'_session');
+    const raw=localStorage.getItem('choppkar_'+S.slug+'_session');
     if(!raw)return null;
     const s=JSON.parse(raw);
     if(!s.token||Date.now()>=s.expiresAt){clearSession();return null;}  // 旧格式无 token → 重新 OTP
@@ -450,7 +450,7 @@ function getSession(){
 }
 function clearSession(){
   try{
-    ['_session','_memberId','_member'].forEach(k=>localStorage.removeItem('chopkar_'+S.slug+k));
+    ['_session','_memberId','_member'].forEach(k=>localStorage.removeItem('choppkar_'+S.slug+k));
   }catch(e){}
 }
 
@@ -470,7 +470,7 @@ async function init(){
   if(sess&&sess.memberId){
     try{
       S.token=sess.token;
-      const saved=localStorage.getItem('chopkar_'+S.slug+'_member');
+      const saved=localStorage.getItem('choppkar_'+S.slug+'_member');
       S.member=saved?JSON.parse(saved):{id:sess.memberId,name:sess.name,phone:sess.phone};
       S.stamps=[];S.redemptions=[];
       const ar=await fetch(API+'/api/member/'+sess.memberId+'/activity');
@@ -524,7 +524,7 @@ function applyBranding(m){
   if(bgValid)root.setProperty('--bg',bg);
   const mt=document.getElementById('meta-theme');if(mt)mt.content=bgValid?bg:T.bg;
   const logo=m.logo_text||m.name.substring(0,6).toUpperCase();
-  document.title=m.name+' · ChopKar';
+  document.title=m.name+' · Choppkar';
   ['otp-brand','nn-brand','mem-brand'].forEach(id=>{const el=$(id);if(el)el.textContent=logo;});
   const hl=$('hero-logo');
   if(hl){if(m.logo_url)hl.innerHTML='<img class="merchant-logo-img" src="'+esc(m.logo_url)+'" alt="logo">';else hl.textContent=logo;}

@@ -1,7 +1,7 @@
 {
-  "name": "loyalapp-backend",
+  "name": "choppkar-backend",
   "version": "1.0.0",
-  "description": "LoyalApp — Multi-tenant loyalty SaaS backend",
+  "description": "Choppkar — Multi-tenant loyalty SaaS backend",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

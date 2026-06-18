@@ -1,4 +1,4 @@
-const CACHE = 'chopkar-v5';
+const CACHE = 'choppkar-v6';
 const ASSETS = ['/card', '/staff', '/icons/icon-192.png'];
 
 self.addEventListener('install', e => {
@@ -31,7 +31,7 @@ self.addEventListener('fetch', e => {
 
 // ── PUSH NOTIFICATIONS ────────────────────────────────────────
 self.addEventListener('push', e => {
-  let data = { title: 'ChopKar', body: 'You have a new update!' };
+  let data = { title: 'Choppkar', body: 'You have a new update!' };
   try { data = e.data.json(); } catch (_) {}
   e.waitUntil(
     self.registration.showNotification(data.title, {
@@ -39,7 +39,7 @@ self.addEventListener('push', e => {
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
       vibrate: [200, 100, 200],
-      tag: 'loyalapp',
+      tag: 'choppkar',
       renotify: true,
       data: { url: data.url || '/card' }
     })

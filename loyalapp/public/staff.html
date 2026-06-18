@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>ChopKar Staff</title>
+<title>Choppkar Staff</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.44.0/dist/tabler-icons.min.css" integrity="sha384-ccZHbezhtZWmNy0cg8odL0D/jFU5k5HIls9y78Qd6lWor7rpvFIZtK0fTFG4z456" crossorigin="anonymous">
 <script src="/i18n.js"></script>
@@ -147,7 +147,7 @@ canvas#scan-canvas{display:none}
 .pd.on{background:var(--brand);border-color:var(--brand);box-shadow:0 0 10px rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.5)}
 .search-input:focus{box-shadow:0 0 0 3px rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.12)}
 .avatar{box-shadow:0 0 0 2px rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.2)}
-/* ChopKar 平台品牌层 (固定红色系, 不被商家覆盖) */
+/* Choppkar 平台品牌层 (固定红色系, 不被商家覆盖) */
 .nav{min-height:56px;background:var(--ck-primary)!important;backdrop-filter:none}
 .nav-brand{color:var(--ck-light)!important}
 .nav-btn{color:var(--ck-light);border-color:rgba(250,236,231,0.4)}
@@ -179,7 +179,7 @@ canvas#scan-canvas{display:none}
       <button class="pk" onclick="pk('0')" style="grid-column-start:2">0</button>
       <button class="pk del" onclick="pd()"><i class="ti ti-backspace" aria-hidden="true"></i></button>
     </div>
-    <div class="ck-footer">Powered by <b>ChopKar</b><br><a href="/privacy" style="color:var(--ck-muted);font-size:10px">Privacy</a> · <a href="/terms" style="color:var(--ck-muted);font-size:10px">Terms</a></div>
+    <div class="ck-footer">Powered by <b>Choppkar</b><br><a href="/privacy" style="color:var(--ck-muted);font-size:10px">Privacy</a> · <a href="/terms" style="color:var(--ck-muted);font-size:10px">Terms</a></div>
   </div>
 </div>
 
@@ -309,8 +309,8 @@ async function init(){
 }
 
 function applyBranding(m){
-  // ChopKar staff 使用平台固定红色系, 不被商家品牌色覆盖
-  document.title=(m.logo_text||m.name)+' · ChopKar Staff';
+  // Choppkar staff 使用平台固定红色系, 不被商家品牌色覆盖
+  document.title=(m.logo_text||m.name)+' · Choppkar Staff';
 }
 
 function setupInstall(){
@@ -340,7 +340,7 @@ async function checkPin(){
   const res=await fetch(API+'/api/staff/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({merchantId:S.merchant.id,pin:S.pin})});
   if(!res.ok){toast('Incorrect PIN');S.pin='';updDots();return;}
   S.staff=await res.json();S.pin='';updDots();
-  $('s-brand').innerHTML='ChopKar <span style="font-size:12px;opacity:.65;letter-spacing:1px">· '+esc(S.merchant.logo_text||S.merchant.name)+'</span>';
+  $('s-brand').innerHTML='Choppkar <span style="font-size:12px;opacity:.65;letter-spacing:1px">· '+esc(S.merchant.logo_text||S.merchant.name)+'</span>';
   $('branch-badge').textContent=S.staff.branch;
   const sel=$('modal-svc');sel.innerHTML='';
   (S.merchant.services||['Service']).forEach(svc=>{const o=document.createElement('option');o.textContent=svc;sel.appendChild(o);});

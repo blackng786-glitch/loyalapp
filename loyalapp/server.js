@@ -52,7 +52,7 @@ function checkLen(fields) {
 // ── AUTH HELPERS ─────────────────────────────────────────────
 // HMAC 签名 token (会员登录态 / 注册票据)。密钥优先用环境变量, 否则从 service key 派生。
 const TOKEN_SECRET = process.env.MEMBER_TOKEN_SECRET ||
-  crypto.createHash('sha256').update('chopkar-member:' + (process.env.SUPABASE_SERVICE_KEY || '')).digest('hex');
+  crypto.createHash('sha256').update('choppkar-member:' + (process.env.SUPABASE_SERVICE_KEY || '')).digest('hex');
 if (!process.env.MEMBER_TOKEN_SECRET) console.warn('[WARN] MEMBER_TOKEN_SECRET not set — using derived fallback. Set a random 64-char hex string in production.');
 
 function safeDbError(err) {
@@ -1082,4 +1082,4 @@ app.get('/privacy', (req, res) => res.sendFile('privacy.html', { root: 'public' 
 app.get('/terms', (req, res) => res.sendFile('terms.html', { root: 'public' }));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`LoyalApp running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Choppkar running on port ${PORT}`));

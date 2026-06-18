@@ -1,4 +1,4 @@
-/* ChopKar i18n — 中 / EN / BM 三语切换引擎
+/* Choppkar i18n — 中 / EN / BM 三语切换引擎
    用法: 各页面 <head> 加 <script src="/i18n.js"></script> 即可。
    原理: 字典 key = 页面里出现的原文, 值含 {zh,en,ms}。
    引擎自动检测语言、注入浮动「中/EN/BM」按钮、翻译静态+动态文案。 */
@@ -231,14 +231,14 @@
     "次卡 / 储值卡": { zh: "次卡 / 储值卡", en: "Session / credit cards", ms: "Kad sesi / kredit" },
     "保存功能开关": { zh: "保存功能开关", en: "Save Features", ms: "Simpan Ciri" },
     "Branding 品牌设置": { zh: "品牌设置 Branding", en: "Branding", ms: "Penjenamaan" },
-    "自定义会员卡颜色与 Logo（仅影响顾客会员卡，不影响 ChopKar 平台界面）": { zh: "自定义会员卡颜色与 Logo（仅影响顾客会员卡，不影响 ChopKar 平台界面）", en: "Customize card color & logo (affects the customer card only)", ms: "Sesuaikan warna kad & logo (hanya kad pelanggan)" },
+    "自定义会员卡颜色与 Logo（仅影响顾客会员卡，不影响 Choppkar 平台界面）": { zh: "自定义会员卡颜色与 Logo（仅影响顾客会员卡，不影响 Choppkar 平台界面）", en: "Customize card color & logo (affects the customer card only)", ms: "Sesuaikan warna kad & logo (hanya kad pelanggan)" },
     "Card Color 卡片主色": { zh: "卡片主色 Card Color", en: "Card Color", ms: "Warna Kad" },
     "Page Background 页面背景色": { zh: "页面背景色 Page Background", en: "Page Background", ms: "Latar Belakang" },
     "上传 Logo": { zh: "上传 Logo", en: "Upload Logo", ms: "Muat Naik Logo" },
     "保存品牌设置": { zh: "保存品牌设置", en: "Save Branding", ms: "Simpan Jenama" },
     "实时预览 Live Preview": { zh: "实时预览 Live Preview", en: "Live Preview", ms: "Pratonton Langsung" },
     "恢复自动": { zh: "恢复自动", en: "Auto", ms: "Auto" },
-    "ChopKar 平台界面颜色不受此影响": { zh: "ChopKar 平台界面颜色不受此影响", en: "ChopKar platform colors are unaffected", ms: "Warna platform ChopKar tidak terjejas" },
+    "Choppkar 平台界面颜色不受此影响": { zh: "Choppkar 平台界面颜色不受此影响", en: "Choppkar platform colors are unaffected", ms: "Warna platform Choppkar tidak terjejas" },
     "功能开关已保存！": { zh: "功能开关已保存！", en: "Features saved!", ms: "Ciri disimpan!" },
     "品牌设置已保存！": { zh: "品牌设置已保存！", en: "Branding saved!", ms: "Jenama disimpan!" },
     "保存失败": { zh: "保存失败", en: "Save failed", ms: "Gagal menyimpan" },
@@ -264,7 +264,7 @@
   var LABELS = { zh: '中', en: 'EN', ms: 'BM' };
 
   function detect() {
-    var s; try { s = localStorage.getItem('chopkar_lang'); } catch (e) {}
+    var s; try { s = localStorage.getItem('choppkar_lang'); } catch (e) {}
     if (LANGS.indexOf(s) !== -1) return s;
     var n = (navigator.language || navigator.userLanguage || '').toLowerCase();
     if (n.indexOf('zh') === 0) return 'zh';
@@ -326,7 +326,7 @@
 
   window.setLang = function (l) {
     if (LANGS.indexOf(l) === -1 || l === LANG) return;
-    LANG = l; try { localStorage.setItem('chopkar_lang', l); } catch (e) {}
+    LANG = l; try { localStorage.setItem('choppkar_lang', l); } catch (e) {}
     applyLang();
     try { window.dispatchEvent(new Event('ck-langchange')); } catch (e) {}
   };
