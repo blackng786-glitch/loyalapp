@@ -3,7 +3,7 @@
 > Single source of truth for progress. Items under "Done" are complete and
 > verified — do not re-investigate them unless something downstream breaks.
 
-Last updated: 2026-06-18
+Last updated: 2026-06-19
 
 ## 🔵 In Progress
 - [ ] (nothing yet)
@@ -13,6 +13,9 @@ Last updated: 2026-06-18
 
 ## ✅ Done
 <!-- Newest at top. Format: - [x] task (YYYY-MM-DD) -->
+- [x] Landing page (public/index.html) — hero, how-it-works, features grid, competitor comparison table, pricing card, CTA, responsive mobile nav (2026-06-19)
+- [x] Full rebrand ChopKar → Choppkar across all files (2026-06-18)
+- [x] Custom domain choppkar.com configured (DNS CNAME + TXT → Railway) (2026-06-18)
 - [x] 商家忘记密码流程 — forgot password link, email reset, PASSWORD_RECOVERY detection, new password form (2026-06-18)
 - [x] 隐私政策 + 用户条款页面 (/privacy, /terms), card/staff/dashboard 页脚链接 (2026-06-18)
 - [x] PWA 图标生成 (192x192 + 512x512) + VAPID keys 生成 + SW cache bump v5 (2026-06-18)
