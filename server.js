@@ -829,6 +829,49 @@ async function processScheduledPushes() {
 }
 setInterval(processScheduledPushes, 60 * 1000);
 
+// ── AUTO CAMPAIGNS (birthday / anniversary — runs daily at scheduler tick) ──
+let _lastAutoCampaignDay = '';
+async function processAutoCampaigns() {
+  const today = new Date();
+  const dayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  if (_lastAutoCampaignDay === dayKey) return;
+  _lastAutoCampaignDay = dayKey;
+
+  try {
+    const mmdd = `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const { data: campaigns } = await db.from('auto_campaigns').select('*').eq('enabled', true);
+    for (const c of (campaigns || [])) {
+      const proCheck = await isPro(c.merchant_id);
+      if (!proCheck) continue;
+
+      if (c.type === 'birthday') {
+        const { data: members } = await db.from('members').select('id')
+          .eq('merchant_id', c.merchant_id).eq('birthday', mmdd);
+        if (members?.length) {
+          const ids = members.map(m => m.id);
+          const sent = await broadcastToMembers(c.merchant_id, c.title, c.body, ids);
+          console.log(`[auto-campaign] birthday push to ${sent}/${ids.length} members for merchant ${c.merchant_id}`);
+        }
+      } else if (c.type === 'anniversary') {
+        const { data: members } = await db.from('members').select('id,created_at')
+          .eq('merchant_id', c.merchant_id);
+        const anniversaryIds = (members || []).filter(m => {
+          const d = new Date(m.created_at);
+          return d.getMonth() === today.getMonth() && d.getDate() === today.getDate()
+            && d.getFullYear() < today.getFullYear();
+        }).map(m => m.id);
+        if (anniversaryIds.length) {
+          const sent = await broadcastToMembers(c.merchant_id, c.title, c.body, anniversaryIds);
+          console.log(`[auto-campaign] anniversary push to ${sent}/${anniversaryIds.length} members for merchant ${c.merchant_id}`);
+        }
+      }
+    }
+  } catch (e) {
+    console.error('[auto-campaign] error', e.message);
+  }
+}
+setInterval(processAutoCampaigns, 5 * 60 * 1000);
+
 // ── SMS QUOTA ───────────────────────────────────────────────────
 function smsMonth() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
 
@@ -967,6 +1010,41 @@ async function handleStripeWebhook(req, res) {
   }
   res.json({ received: true });
 }
+
+// ── AUTO CAMPAIGNS CRUD ──────────────────────────────────────
+app.get('/api/auto-campaigns/:merchantId', async (req, res) => {
+  const m = await requireMerchant(req, res, req.params.merchantId);
+  if (!m) return;
+  const { data } = await db.from('auto_campaigns').select('*').eq('merchant_id', req.params.merchantId);
+  res.json(data || []);
+});
+
+app.put('/api/auto-campaigns/:merchantId', async (req, res) => {
+  const m = await requireMerchant(req, res, req.params.merchantId);
+  if (!m) return;
+  const { type, enabled, title, body } = req.body;
+  if (!type || !['birthday', 'anniversary'].includes(type)) return res.status(400).json({ error: 'type must be birthday or anniversary' });
+  if (!title || !body) return res.status(400).json({ error: 'title and body required' });
+  const lenErr = checkLen([[title, LIMITS.title, 'Title'], [body, LIMITS.body, 'Body']]);
+  if (lenErr) return res.status(400).json({ error: lenErr });
+  const { data, error } = await db.from('auto_campaigns').upsert({
+    merchant_id: req.params.merchantId, type, enabled: !!enabled, title, body,
+  }, { onConflict: 'merchant_id,type' }).select().single();
+  if (error) return res.status(400).json({ error: safeDbError(error) });
+  res.json(data);
+});
+
+// ── UPDATE MEMBER BIRTHDAY (staff or merchant) ───────────────
+app.patch('/api/member/:id/birthday', async (req, res) => {
+  const { birthday, merchantId } = req.body;
+  if (!merchantId) return res.status(400).json({ error: 'merchantId required' });
+  const auth = await requireStaffOrMerchant(req, res, merchantId);
+  if (!auth) return;
+  if (birthday && !/^\d{2}-\d{2}$/.test(birthday)) return res.status(400).json({ error: 'birthday format: MM-DD' });
+  const { error } = await db.from('members').update({ birthday: birthday || null }).eq('id', req.params.id).eq('merchant_id', merchantId);
+  if (error) return res.status(400).json({ error: safeDbError(error) });
+  res.json({ success: true });
+});
 
 // ── BRANCHES (多门店管理) ─────────────────────────────────────
 app.get('/api/branches/:merchantId', async (req, res) => {

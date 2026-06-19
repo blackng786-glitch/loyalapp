@@ -343,6 +343,7 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
             <button data-d="30" class="on" onclick="setRange(30,this)">30d</button>
             <button data-d="90" onclick="setRange(90,this)">90d</button>
           </div>
+          <button class="btn btn-green btn-sm" onclick="exportAnalyticsCSV()" title="Export analytics"><i class="ti ti-download" aria-hidden="true"></i></button>
         </div>
       </div>
       <div class="mini-stats">
@@ -421,6 +422,35 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
     <div class="card">
       <div class="card-title">Recent Activity</div>
       <div id="d-activity"><div class="loader"><i class="ti ti-loader-2" aria-hidden="true"></i></div></div>
+    </div>
+
+    <!-- AUTO CAMPAIGNS (Pro) -->
+    <div class="card" id="auto-campaign-card">
+      <div class="card-title"><i class="ti ti-robot" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>Auto Campaigns <span style="font-size:10px;color:var(--gold);background:rgba(216,90,48,0.12);padding:2px 8px;border-radius:10px;margin-left:6px">PRO</span></div>
+      <div class="card-sub">Automatically send push notifications on members' birthdays and membership anniversaries</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px" id="auto-campaigns-grid">
+        <div style="background:var(--s2);border-radius:10px;padding:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <b style="font-size:13px"><i class="ti ti-cake" aria-hidden="true" style="margin-right:4px"></i> Birthday</b>
+            <label style="cursor:pointer"><input type="checkbox" id="ac-birthday-on" onchange="saveAutoCampaign('birthday')"> Enable</label>
+          </div>
+          <input class="input" id="ac-birthday-title" placeholder="Title: Happy Birthday! 🎂" maxlength="200" style="margin-bottom:6px;font-size:12px">
+          <input class="input" id="ac-birthday-body" placeholder="Message: Enjoy a free reward on us!" maxlength="1000" style="font-size:12px">
+        </div>
+        <div style="background:var(--s2);border-radius:10px;padding:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <b style="font-size:13px"><i class="ti ti-confetti" aria-hidden="true" style="margin-right:4px"></i> Anniversary</b>
+            <label style="cursor:pointer"><input type="checkbox" id="ac-anniversary-on" onchange="saveAutoCampaign('anniversary')"> Enable</label>
+          </div>
+          <input class="input" id="ac-anniversary-title" placeholder="Title: Happy Anniversary! 🎉" maxlength="200" style="margin-bottom:6px;font-size:12px">
+          <input class="input" id="ac-anniversary-body" placeholder="Message: Thanks for being a loyal member!" maxlength="1000" style="font-size:12px">
+        </div>
+      </div>
+      <div id="ac-pro-gate" style="display:none;text-align:center;padding:14px;font-size:13px;color:var(--t3)">
+        <i class="ti ti-lock" style="font-size:20px;display:block;margin-bottom:4px" aria-hidden="true"></i>
+        Upgrade to Pro to enable auto campaigns
+        <button class="btn btn-sm" onclick="upgradeToProPlan()" style="margin-top:8px;background:var(--gold);color:#fff"><i class="ti ti-crown" aria-hidden="true"></i> Upgrade</button>
+      </div>
     </div>
 
     <!-- BRANCHES -->
@@ -728,6 +758,7 @@ async function showDashboard(){
   loadAnalytics();
   loadSecurityEvents();
   loadBilling();
+  loadAutoCampaigns();
   initBranding();
   initFeatures();
   if(S.merchant.feature_bottle){$('cellar-card').style.display='';loadCellar();}else{$('cellar-card').style.display='none';}
@@ -773,15 +804,39 @@ function renderMembersTable(members){
 }
 
 // EXPORT CSV
-function exportCSV(){
-  if(!S.allMembers.length){toast('No members to export');return;}
-  const rows=[['Name','Phone','Tier','Total Stamps','Points','Join Date'],...S.allMembers.map(m=>[m.name,m.phone,m.tier,m.stampCount,m.stampCount*10,new Date(m.created_at).toLocaleDateString('en-MY')])];
-  const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
-  const blob=new Blob([csv],{type:'text/csv'});
+function downloadCSV(rows,filename){
+  const csv=rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\n');
+  const bom='﻿';
+  const blob=new Blob([bom+csv],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download=S.merchant.name.replace(/\s+/g,'-')+'-members.csv';a.click();
+  const a=document.createElement('a');a.href=url;a.download=filename;a.click();
   URL.revokeObjectURL(url);
   toast('CSV downloaded!');
+}
+function exportCSV(){
+  if(!S.allMembers.length){toast('No members to export');return;}
+  const rows=[['Name','Phone','Tier','Total Stamps','Redemptions','Join Date'],...S.allMembers.map(m=>[m.name,m.phone,m.tier,m.stampCount,m.redeemCount,new Date(m.created_at).toLocaleDateString('en-MY')])];
+  downloadCSV(rows,S.merchant.name.replace(/\s+/g,'-')+'-members-'+new Date().toISOString().slice(0,10)+'.csv');
+}
+function exportAnalyticsCSV(){
+  if(!S._lastAnalytics){toast('Load analytics first');return;}
+  const a=S._lastAnalytics;
+  const rows=[['Date','Stamps','New Members']];
+  const ds=a.dailyStamps||[],dm=a.dailyMembers||[];
+  const memberMap={};dm.forEach(d=>{memberMap[d.date]=d.count;});
+  ds.forEach(d=>{rows.push([d.date,d.count,memberMap[d.date]||0]);});
+  rows.push([]);rows.push(['Summary']);
+  rows.push(['Total Stamps',a.totalStamps]);
+  rows.push(['Total Members',a.totalMembers]);
+  rows.push(['Repeat Rate',a.repeatRate+'%']);
+  rows.push(['Redemptions',a.totalRedemptions]);
+  rows.push([]);rows.push(['Service','Count']);
+  (a.serviceBreakdown||[]).forEach(s=>{rows.push([s.label,s.count]);});
+  rows.push([]);rows.push(['Branch','Count']);
+  (a.branchBreakdown||[]).forEach(b=>{rows.push([b.label,b.count]);});
+  rows.push([]);rows.push(['Tier','Count']);
+  Object.entries(a.tierBreakdown||{}).forEach(([t,c])=>{rows.push([t,c]);});
+  downloadCSV(rows,S.merchant.name.replace(/\s+/g,'-')+'-analytics-'+a.days+'d-'+new Date().toISOString().slice(0,10)+'.csv');
 }
 
 // ── PUSH / MARKETING ──────────────────────────────
@@ -888,6 +943,7 @@ async function loadAnalytics(){
   const branch=$('an-branch').value;
   const data=await fetch(API+'/api/analytics/'+S.merchant.id+'?days='+S.anDays+'&branch='+encodeURIComponent(branch)).then(r=>r.json()).catch(()=>null);
   if(!data)return;
+  S._lastAnalytics=data;
   $('an-stamps').textContent=data.totalStamps;
   $('an-repeat').textContent=data.repeatRate+'%';
   $('an-redeem').textContent=data.totalRedemptions;
@@ -987,6 +1043,34 @@ async function manageBilling(){
     const data=await r.json();
     if(data.url)window.location.href=data.url;
   }catch(e){toast('Failed to open billing portal');}
+}
+
+// ── AUTO CAMPAIGNS ──────────────────────────────────
+async function loadAutoCampaigns(){
+  const grid=$('auto-campaigns-grid'),gate=$('ac-pro-gate');
+  try{
+    const billing=await fetch(API+'/api/billing/'+S.merchant.id).then(r=>r.json()).catch(()=>({}));
+    const isProPlan=billing.plan==='pro';
+    if(!isProPlan){grid.style.display='none';gate.style.display='';return;}
+    grid.style.display='';gate.style.display='none';
+    const data=await fetch(API+'/api/auto-campaigns/'+S.merchant.id).then(r=>r.json());
+    (data||[]).forEach(c=>{
+      $('ac-'+c.type+'-on').checked=c.enabled;
+      $('ac-'+c.type+'-title').value=c.title||'';
+      $('ac-'+c.type+'-body').value=c.body||'';
+    });
+  }catch(e){console.error('[auto-campaigns]',e);}
+}
+async function saveAutoCampaign(type){
+  const enabled=$('ac-'+type+'-on').checked;
+  const title=$('ac-'+type+'-title').value.trim()||('Happy '+(type==='birthday'?'Birthday! 🎂':'Anniversary! 🎉'));
+  const body=$('ac-'+type+'-body').value.trim()||('Thank you for being a valued member!');
+  try{
+    const r=await fetch(API+'/api/auto-campaigns/'+S.merchant.id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,enabled,title,body})});
+    const data=await r.json();
+    if(data.error){toast(data.error);return;}
+    toast(type+' campaign '+(enabled?'enabled':'disabled'));
+  }catch(e){toast('Failed to save');}
 }
 
 const BRAND_PRESETS=['#993C1D','#C0392B','#D85A30','#E8943A','#F4B400','#F6C453','#2E7D5B','#43A047','#7CB342','#00897B','#2C6E9B','#1E88E5','#5E35B1','#8E44AD','#D81B60','#EC6F9B','#6D4C41','#37474F','#F2D9CE','#F7F5F3'];
