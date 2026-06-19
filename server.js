@@ -533,28 +533,36 @@ app.get('/api/members/search', async (req, res) => {
   res.json(members.map(m => ({ ...m, stampCount: sc[m.id] || 0, redeemCount: rc[m.id] || 0 })));
 });
 
-// ── ALL MEMBERS (staff/dashboard) ─────────────────────────────
+// ── ALL MEMBERS (staff/dashboard, paginated) ─────────────────
 app.get('/api/members/all', async (req, res) => {
-  const { merchantId } = req.query;
+  const { merchantId, page: pg, limit: lim } = req.query;
   const auth = await requireStaffOrMerchant(req, res, merchantId);
   if (!auth) return;
-  const { data: members } = await db.from('members').select('*')
-    .eq('merchant_id', merchantId).order('created_at', { ascending: false });
-  if (!members?.length) return res.json([]);
+  const page = Math.max(1, parseInt(pg) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(lim) || 50));
+  const from = (page - 1) * limit;
+  const { data: members, count: totalCount } = await db.from('members')
+    .select('*', { count: 'exact' })
+    .eq('merchant_id', merchantId).order('created_at', { ascending: false })
+    .range(from, from + limit - 1);
+  if (!members?.length) return res.json({ members: [], total: totalCount || 0, page, limit });
   const ids = members.map(m => m.id);
-  const { data: stampRows } = await db.from('stamps').select('member_id').in('member_id', ids);
-  const { data: redeemRows } = await db.from('redemptions').select('member_id').in('member_id', ids);
+  const [{ data: stampRows }, { data: redeemRows }] = await Promise.all([
+    db.from('stamps').select('member_id').in('member_id', ids),
+    db.from('redemptions').select('member_id').in('member_id', ids),
+  ]);
   const sc = {}, rc = {};
   (stampRows || []).forEach(s => sc[s.member_id] = (sc[s.member_id] || 0) + 1);
   (redeemRows || []).forEach(r => rc[r.member_id] = (rc[r.member_id] || 0) + 1);
-  res.json(members.map(m => {
-    const stamps = sc[m.id] || 0;
-    let tier = 'Bronze';
-    if (stamps >= 200) tier = 'Platinum';
-    else if (stamps >= 100) tier = 'Gold';
-    else if (stamps >= 50) tier = 'Silver';
-    return { ...m, stampCount: stamps, total_stamps: stamps, redeemCount: rc[m.id] || 0, tier };
-  }));
+  res.json({
+    members: members.map(m => {
+      const stamps = sc[m.id] || 0;
+      let tier = 'Bronze';
+      if (stamps >= 200) tier = 'Platinum'; else if (stamps >= 100) tier = 'Gold'; else if (stamps >= 50) tier = 'Silver';
+      return { ...m, stampCount: stamps, total_stamps: stamps, redeemCount: rc[m.id] || 0, tier };
+    }),
+    total: totalCount || 0, page, limit,
+  });
 });
 
 // ── ADD STAMP ────────────────────────────────────────────────
@@ -764,15 +772,22 @@ async function broadcastToMembers(merchantId, title, body, memberIds) {
   if (!ids.length) return 0;
 
   const { data: subs } = await db.from('push_subscriptions').select('*').in('member_id', ids);
+  if (!subs?.length) return 0;
+  const payload = JSON.stringify({ title, body });
+  const BATCH = 50;
   let sent = 0;
-  for (const sub of (subs || [])) {
-    try {
-      await webpush.sendNotification(sub.subscription, JSON.stringify({ title, body }));
-      sent++;
-    } catch (e) {
-      if (e.statusCode === 410) await db.from('push_subscriptions').delete().eq('id', sub.id);
-    }
+  const stale = [];
+  for (let i = 0; i < subs.length; i += BATCH) {
+    const batch = subs.slice(i, i + BATCH);
+    const results = await Promise.allSettled(
+      batch.map(sub => webpush.sendNotification(sub.subscription, payload))
+    );
+    results.forEach((r, idx) => {
+      if (r.status === 'fulfilled') sent++;
+      else if (r.reason?.statusCode === 410) stale.push(batch[idx].id);
+    });
   }
+  if (stale.length) db.from('push_subscriptions').delete().in('id', stale).then(() => {}).catch(() => {});
   return sent;
 }
 
@@ -850,14 +865,23 @@ app.get('/api/analytics/:merchantId', async (req, res) => {
     .eq('merchant_id', mid).gte('created_at', sinceIso);
   if (branch) stampQ = stampQ.eq('branch', branch);
 
-  const [stampsR, membersR, redeemR, allStampsR] = await Promise.all([
+  const [stampsR, membersR, redeemR, stampCountsR] = await Promise.all([
     stampQ,
     db.from('members').select('id,created_at').eq('merchant_id', mid),
     db.from('redemptions').select('created_at').eq('merchant_id', mid).gte('created_at', sinceIso),
-    db.from('stamps').select('member_id').eq('merchant_id', mid),  // 全量, 用于 tier/复购
+    db.rpc('stamp_counts_by_member', { mid }).catch(() => ({ data: null })),
   ]);
   const stamps = stampsR.data || [], members = membersR.data || [],
-        redemptions = redeemR.data || [], allStamps = allStampsR.data || [];
+        redemptions = redeemR.data || [];
+
+  // stamp counts per member — prefer DB aggregate, fallback to JS count
+  let perMember = {};
+  if (stampCountsR.data) {
+    stampCountsR.data.forEach(r => { perMember[r.member_id] = r.cnt; });
+  } else {
+    const { data: allStamps } = await db.from('stamps').select('member_id').eq('merchant_id', mid);
+    (allStamps || []).forEach(s => perMember[s.member_id] = (perMember[s.member_id] || 0) + 1);
+  }
 
   // 生成过去 N 天的日期骨架
   const dayKey = d => new Date(d).toISOString().slice(0, 10);
@@ -874,9 +898,7 @@ app.get('/api/analytics/:merchantId', async (req, res) => {
   const svc = {}, br = {};
   stamps.forEach(s => { svc[s.service] = (svc[s.service] || 0) + 1; br[s.branch] = (br[s.branch] || 0) + 1; });
 
-  // 等级分布 + 复购率 (基于全量印章)
-  const perMember = {};
-  allStamps.forEach(s => perMember[s.member_id] = (perMember[s.member_id] || 0) + 1);
+  // 等级分布 + 复购率
   const tierCount = { Bronze: 0, Silver: 0, Gold: 0, Platinum: 0 };
   members.forEach(m => {
     const c = perMember[m.id] || 0;

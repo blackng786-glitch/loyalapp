@@ -730,8 +730,8 @@ async function loadStats(){
 async function loadAllMembers(){
   const tbody=$('members-tbody');
   tbody.innerHTML='<tr><td colspan="6" class="empty-sm">Loading...</td></tr>';
-  const data=await fetch(API+'/api/members/all?merchantId='+S.merchant.id).then(r=>r.json());
-  S.allMembers=data||[];S.filteredMembers=S.allMembers;
+  const res=await fetch(API+'/api/members/all?merchantId='+S.merchant.id+'&limit=100').then(r=>r.json());
+  S.allMembers=res.members||res||[];S.filteredMembers=S.allMembers;
   $('member-badge').textContent=S.allMembers.length;
   renderMembersTable(S.allMembers);
 }

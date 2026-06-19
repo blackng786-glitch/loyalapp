@@ -13,6 +13,7 @@ Last updated: 2026-06-19
 
 ## ✅ Done
 <!-- Newest at top. Format: - [x] task (YYYY-MM-DD) -->
+- [x] Scalability fixes — /members/all pagination, push broadcast batched (Promise.allSettled ×50), analytics DB aggregate function, DB indexes (migration-v8) (2026-06-19)
 - [x] Landing page (public/index.html) — hero, how-it-works, features grid, competitor comparison table, pricing card, CTA, responsive mobile nav (2026-06-19)
 - [x] Full rebrand ChopKar → Choppkar across all files (2026-06-18)
 - [x] Custom domain choppkar.com configured (DNS CNAME + TXT → Railway) (2026-06-18)
