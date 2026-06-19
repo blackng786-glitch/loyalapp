@@ -537,6 +537,20 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
       <div id="sec-empty" style="display:none;text-align:center;padding:24px;color:var(--green);font-size:13px"><i class="ti ti-shield-check" style="font-size:28px;display:block;margin-bottom:6px" aria-hidden="true"></i>No security events — all clear</div>
     </div>
 
+    <!-- BILLING / PLAN -->
+    <div class="card" id="billing-card">
+      <div class="card-title"><i class="ti ti-crown" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>Plan & Billing</div>
+      <div class="stats-grid" style="margin-bottom:16px">
+        <div class="stat"><div class="stat-lbl">Current Plan</div><div class="stat-val" id="bill-plan" style="text-transform:uppercase">FREE</div></div>
+        <div class="stat"><div class="stat-lbl">SMS Used</div><div class="stat-val" id="bill-sms">0 / 50</div></div>
+      </div>
+      <div id="bill-status" style="font-size:13px;color:var(--t2);margin-bottom:14px"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" id="btn-upgrade" onclick="upgradeToProPlan()" style="background:var(--gold);color:#fff"><i class="ti ti-crown" aria-hidden="true"></i> Upgrade to Pro — RM49/mo</button>
+        <button class="btn" id="btn-manage" onclick="manageBilling()" style="display:none"><i class="ti ti-credit-card" aria-hidden="true"></i> Manage Billing</button>
+      </div>
+    </div>
+
     <!-- FOOTER -->
     <div style="text-align:center;font-size:10px;color:var(--ck-muted);letter-spacing:1px;padding:10px 0 4px">Powered by <b style="color:var(--ck-accent);font-weight:500">Choppkar</b></div>
 
@@ -654,6 +668,9 @@ async function loadMerchant(){
   if(!data){S.merchant=null;$('slug-prefix').textContent=location.origin+'/card?m=';show('setup');return;}
   S.merchant=data;
   showDashboard();
+  const params=new URLSearchParams(location.search);
+  if(params.get('billing')==='success'){toast('🎉 Upgraded to Pro! Thank you.');history.replaceState(null,'','/dashboard');}
+  if(params.get('billing')==='cancel'){toast('Checkout cancelled');history.replaceState(null,'','/dashboard');}
 }
 
 var _slugTimer=null,_slugManual=false;
@@ -710,6 +727,7 @@ async function showDashboard(){
   loadScheduled();
   loadAnalytics();
   loadSecurityEvents();
+  loadBilling();
   initBranding();
   initFeatures();
   if(S.merchant.feature_bottle){$('cellar-card').style.display='';loadCellar();}else{$('cellar-card').style.display='none';}
@@ -928,6 +946,47 @@ async function loadSecurityEvents(){
         +sorted.map(function(p){return '<div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 0"><span style="font-family:\'DM Mono\',monospace;color:var(--t2)">'+esc(p[0])+'</span><span style="background:var(--s3);border-radius:10px;padding:2px 8px;font-size:10px;color:#E24B4A">'+p[1]+' events</span></div>';}).join('');
     }else{$('sec-ips').innerHTML='';}
   }catch(e){$('sec-tbody').innerHTML='<tr><td colspan="5" class="empty-sm" style="color:#E24B4A">Failed to load security data</td></tr>';}
+}
+
+// ── BILLING ──────────────────────────────────────────
+async function loadBilling(){
+  try{
+    const data=await fetch(API+'/api/billing/'+S.merchant.id).then(r=>r.json());
+    const planEl=$('bill-plan'), smsEl=$('bill-sms'), statusEl=$('bill-status');
+    const badge=document.querySelector('.plan-badge');
+    if(data.plan==='pro'){
+      planEl.textContent='PRO';planEl.style.color='var(--gold)';
+      if(badge){badge.textContent='Pro';badge.style.background='rgba(216,90,48,0.2)';}
+      $('btn-upgrade').style.display='none';
+      $('btn-manage').style.display='';
+      if(data.expiresAt){statusEl.textContent='Cancels on '+new Date(data.expiresAt).toLocaleDateString();}
+      else{statusEl.textContent='Active subscription';}
+    }else{
+      planEl.textContent='FREE';planEl.style.color='var(--t2)';
+      if(badge){badge.textContent='Free';}
+      $('btn-upgrade').style.display='';
+      $('btn-manage').style.display=data.hasSubscription?'':'none';
+      statusEl.textContent='';
+    }
+    var smsLimit=data.sms?.limit==='unlimited'?'∞':data.sms?.limit||50;
+    smsEl.textContent=(data.sms?.used||0)+' / '+smsLimit;
+    if(data.sms?.used>=data.sms?.limit&&data.sms?.limit!=='unlimited'){smsEl.style.color='#E24B4A';}else{smsEl.style.color='';}
+  }catch(e){console.error('[billing]',e);}
+}
+async function upgradeToProPlan(){
+  try{
+    const r=await fetch(API+'/api/billing/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({merchantId:S.merchant.id})});
+    const data=await r.json();
+    if(data.error){toast(data.error);return;}
+    if(data.url)window.location.href=data.url;
+  }catch(e){toast('Failed to start checkout');}
+}
+async function manageBilling(){
+  try{
+    const r=await fetch(API+'/api/billing/portal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({merchantId:S.merchant.id})});
+    const data=await r.json();
+    if(data.url)window.location.href=data.url;
+  }catch(e){toast('Failed to open billing portal');}
 }
 
 const BRAND_PRESETS=['#993C1D','#C0392B','#D85A30','#E8943A','#F4B400','#F6C453','#2E7D5B','#43A047','#7CB342','#00897B','#2C6E9B','#1E88E5','#5E35B1','#8E44AD','#D81B60','#EC6F9B','#6D4C41','#37474F','#F2D9CE','#F7F5F3'];

@@ -5,7 +5,13 @@ const helmet  = require('helmet');
 const bcrypt  = require('bcryptjs');
 const webpush = require('web-push');
 const crypto  = require('crypto');
+const Stripe  = require('stripe');
 const { createClient } = require('@supabase/supabase-js');
+
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
+const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID || '';
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '';
+const SMS_FREE_QUOTA = parseInt(process.env.SMS_FREE_QUOTA) || 50;
 
 const app = express();
 app.set('trust proxy', 1);                 // Railway 反代后取真实客户端 IP (限流用)
@@ -20,6 +26,8 @@ app.use(helmet({
   contentSecurityPolicy: false,            // 前端 inline script 需要; XSS 由 esc() 手动防
   crossOriginEmbedderPolicy: false,        // 允许外部 CDN 资源加载
 }));
+// Stripe webhook needs raw body — must be before express.json()
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
 app.use(express.json({ limit: '6mb' }));   // 6mb 以容纳 base64 logo 上传
 app.get('/bottle', (req, res) => { res.redirect(301, '/card' + (req.query.m ? '?m=' + encodeURIComponent(req.query.m) : '')); });
 app.get('/api/health', async (req, res) => {
@@ -370,8 +378,13 @@ app.post('/api/merchant/:slug/upload-logo', async (req, res) => {
 
 // ── CUSTOMER OTP AUTH (Supabase Phone OTP) ───────────────────
 app.post('/api/auth/send-otp', async (req, res) => {
-  const { phone } = req.body;
+  const { phone, merchantId: otpMerchantId } = req.body;
   if (!phone || phone.length < 8) return res.status(400).json({ error: '请输入有效手机号' });
+  // SMS quota check (per merchant)
+  if (otpMerchantId) {
+    const quota = await checkSmsQuota(otpMerchantId);
+    if (!quota.allowed) return res.status(402).json({ error: `SMS quota exceeded (${quota.used}/${quota.limit} this month). Upgrade to Pro for unlimited.`, code: 'SMS_QUOTA' });
+  }
   // 限流: 防短信轰炸 + 控制 SMS 成本
   if (!rateOk('otp:p1:' + phone, 60 * 1000, 1))        { recordStrike(req.ip); logSec('rate_limit', 'warn', req.ip, null, { type: 'otp_send', phone }); return res.status(429).json({ error: '发送太频繁，请 1 分钟后再试' }); }
   if (!rateOk('otp:pd:' + phone, 24 * 3600 * 1000, 8)) { recordStrike(req.ip); logSec('rate_limit', 'warn', req.ip, null, { type: 'otp_daily', phone }); return res.status(429).json({ error: '该号码今日发送次数已达上限' }); }
@@ -379,6 +392,7 @@ app.post('/api/auth/send-otp', async (req, res) => {
   try {
     const { error } = await authClient.auth.signInWithOtp({ phone });
     if (error) return res.status(400).json({ error: error.message });
+    if (otpMerchantId) incrementSmsCount(otpMerchantId).catch(e => console.error('[sms-count]', e.message));
     res.json({ success: true });
   } catch (e) {
     console.error('[send-otp]', e.message);
@@ -814,6 +828,145 @@ async function processScheduledPushes() {
   }
 }
 setInterval(processScheduledPushes, 60 * 1000);
+
+// ── SMS QUOTA ───────────────────────────────────────────────────
+function smsMonth() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
+
+async function checkSmsQuota(merchantId) {
+  const month = smsMonth();
+  const { data } = await db.from('sms_usage')
+    .select('count').eq('merchant_id', merchantId).eq('month', month).maybeSingle();
+  const used = data?.count || 0;
+  const { data: m } = await db.from('merchants').select('plan').eq('id', merchantId).maybeSingle();
+  const isPro = m?.plan === 'pro';
+  const limit = isPro ? Infinity : SMS_FREE_QUOTA;
+  return { used, limit, allowed: used < limit, isPro };
+}
+
+async function incrementSmsCount(merchantId) {
+  const month = smsMonth();
+  const { data } = await db.from('sms_usage')
+    .select('id,count').eq('merchant_id', merchantId).eq('month', month).maybeSingle();
+  if (data) {
+    await db.from('sms_usage').update({ count: data.count + 1 }).eq('id', data.id);
+  } else {
+    await db.from('sms_usage').insert({ merchant_id: merchantId, month, count: 1 });
+  }
+}
+
+// ── PRO PLAN CHECK HELPER ───────────────────────────────────────
+async function isPro(merchantId) {
+  const { data } = await db.from('merchants').select('plan,plan_expires_at').eq('id', merchantId).maybeSingle();
+  if (!data || data.plan !== 'pro') return false;
+  if (data.plan_expires_at && new Date(data.plan_expires_at) < new Date()) return false;
+  return true;
+}
+
+// ── STRIPE BILLING ──────────────────────────────────────────────
+// Create Checkout Session (merchant subscribes to Pro)
+app.post('/api/billing/checkout', async (req, res) => {
+  if (!stripe) return res.status(503).json({ error: 'Billing not configured' });
+  const { merchantId } = req.body;
+  const m = await requireMerchant(req, res, merchantId);
+  if (!m) return;
+
+  const { data: merchant } = await db.from('merchants').select('email,stripe_customer_id,name').eq('id', merchantId).maybeSingle();
+  let customerId = merchant?.stripe_customer_id;
+  if (!customerId) {
+    const customer = await stripe.customers.create({ email: merchant.email, name: merchant.name, metadata: { merchantId } });
+    customerId = customer.id;
+    await db.from('merchants').update({ stripe_customer_id: customerId }).eq('id', merchantId);
+  }
+
+  const session = await stripe.checkout.sessions.create({
+    customer: customerId,
+    mode: 'subscription',
+    line_items: [{ price: STRIPE_PRICE_ID, quantity: 1 }],
+    success_url: `${req.headers.origin || 'https://choppkar.com'}/dashboard?billing=success`,
+    cancel_url: `${req.headers.origin || 'https://choppkar.com'}/dashboard?billing=cancel`,
+    metadata: { merchantId },
+  });
+  res.json({ url: session.url });
+});
+
+// Customer portal (manage subscription, cancel, update card)
+app.post('/api/billing/portal', async (req, res) => {
+  if (!stripe) return res.status(503).json({ error: 'Billing not configured' });
+  const { merchantId } = req.body;
+  const m = await requireMerchant(req, res, merchantId);
+  if (!m) return;
+  const { data: merchant } = await db.from('merchants').select('stripe_customer_id').eq('id', merchantId).maybeSingle();
+  if (!merchant?.stripe_customer_id) return res.status(400).json({ error: 'No billing account' });
+  const session = await stripe.billingPortal.sessions.create({
+    customer: merchant.stripe_customer_id,
+    return_url: `${req.headers.origin || 'https://choppkar.com'}/dashboard`,
+  });
+  res.json({ url: session.url });
+});
+
+// Billing status (for dashboard UI)
+app.get('/api/billing/:merchantId', async (req, res) => {
+  const m = await requireMerchant(req, res, req.params.merchantId);
+  if (!m) return;
+  const { data: merchant } = await db.from('merchants').select('plan,plan_expires_at,stripe_subscription_id').eq('id', req.params.merchantId).maybeSingle();
+  const quota = await checkSmsQuota(req.params.merchantId);
+  res.json({
+    plan: merchant?.plan || 'free',
+    expiresAt: merchant?.plan_expires_at || null,
+    hasSubscription: !!merchant?.stripe_subscription_id,
+    sms: { used: quota.used, limit: quota.isPro ? 'unlimited' : quota.limit },
+  });
+});
+
+// Stripe Webhook handler (defined early, called with raw body)
+async function handleStripeWebhook(req, res) {
+  if (!stripe || !STRIPE_WEBHOOK_SECRET) return res.status(503).send('Not configured');
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], STRIPE_WEBHOOK_SECRET);
+  } catch (e) {
+    console.error('[stripe] webhook signature failed:', e.message);
+    return res.status(400).send('Invalid signature');
+  }
+
+  const sub = event.data.object;
+  const merchantId = sub.metadata?.merchantId || null;
+
+  switch (event.type) {
+    case 'checkout.session.completed': {
+      if (sub.mode === 'subscription' && sub.subscription) {
+        const mid = sub.metadata?.merchantId;
+        if (mid) {
+          await db.from('merchants').update({
+            plan: 'pro', stripe_subscription_id: sub.subscription, plan_expires_at: null,
+          }).eq('id', mid);
+          console.log(`[stripe] merchant ${mid} upgraded to Pro`);
+        }
+      }
+      break;
+    }
+    case 'customer.subscription.updated': {
+      const mid = sub.metadata?.merchantId;
+      if (mid && sub.cancel_at_period_end) {
+        const expiresAt = new Date(sub.current_period_end * 1000).toISOString();
+        await db.from('merchants').update({ plan_expires_at: expiresAt }).eq('stripe_subscription_id', sub.id);
+        console.log(`[stripe] merchant ${mid} cancelling at ${expiresAt}`);
+      } else if (mid && !sub.cancel_at_period_end) {
+        await db.from('merchants').update({ plan_expires_at: null }).eq('stripe_subscription_id', sub.id);
+      }
+      break;
+    }
+    case 'customer.subscription.deleted': {
+      await db.from('merchants').update({ plan: 'free', stripe_subscription_id: null, plan_expires_at: null })
+        .eq('stripe_subscription_id', sub.id);
+      console.log(`[stripe] subscription ${sub.id} ended — downgraded to free`);
+      break;
+    }
+    default:
+      break;
+  }
+  res.json({ received: true });
+}
 
 // ── BRANCHES (多门店管理) ─────────────────────────────────────
 app.get('/api/branches/:merchantId', async (req, res) => {
