@@ -28,6 +28,7 @@ app.get('/api/health', async (req, res) => {
     res.json({ db: error ? 'error' : 'ok', count: data?.length ?? 0 });
   } catch (e) { console.error('[health]', e.message); res.status(500).json({ db: 'crash' }); }
 });
+app.get('/', (req, res) => res.redirect('/dashboard'));
 app.use(express.static('public'));
 
 // ── DB (service key for server-side operations) ──────────────
