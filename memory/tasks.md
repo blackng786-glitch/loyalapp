@@ -3,16 +3,20 @@
 > Single source of truth for progress. Items under "Done" are complete and
 > verified — do not re-investigate them unless something downstream breaks.
 
-Last updated: 2026-06-19
+Last updated: 2026-06-20
 
 ## 🔵 In Progress
 - [ ] (nothing yet)
 
 ## 📋 To Do
 - [ ] VAPID keys 配置到 Railway 环境变量 (需要用户手动操作)
+- [ ] Run migration-v8, v9, v10, v11 in Supabase SQL Editor
+- [ ] Set Stripe env vars on Railway (when bank account approved)
 
 ## ✅ Done
 <!-- Newest at top. Format: - [x] task (YYYY-MM-DD) -->
+- [x] Referral program 推荐裂变 — server endpoints (gen code, lookup, claim, stats, merchant overview, settings), migration-v11 (referral_code, referrals table, merchant settings), card.html referral tab (share link, copy, Web Share API, stats), dashboard referral card (toggle, bonus config, referral list), feature toggle integration (2026-06-20)
+- [x] CSV export (members + analytics) + auto campaigns (birthday/anniversary push, Pro only) + migration-v10 (2026-06-19)
 - [x] Stripe billing + Pro plan + SMS quota — checkout, portal, webhook, dashboard billing card, sms_usage table, OTP quota check (2026-06-19)
 - [x] Scalability fixes — /members/all pagination, push broadcast batched (Promise.allSettled ×50), analytics DB aggregate function, DB indexes (migration-v8) (2026-06-19)
 - [x] Landing page (public/index.html) — hero, how-it-works, features grid, competitor comparison table, pricing card, CTA, responsive mobile nav (2026-06-19)

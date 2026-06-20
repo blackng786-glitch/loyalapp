@@ -453,6 +453,37 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
       </div>
     </div>
 
+    <!-- REFERRAL 推荐裂变 -->
+    <div class="card" id="referral-card" style="display:none">
+      <div class="card-title"><i class="ti ti-users-plus" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>推荐裂变 Referral Program</div>
+      <div class="card-sub">会员推荐朋友注册，双方都能获得奖励印章</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px">
+        <div style="background:var(--s2);border-radius:10px;padding:16px;text-align:center">
+          <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Total Referrals</div>
+          <div style="font-family:'DM Mono',monospace;font-size:28px;color:var(--gold)" id="rf-total">0</div>
+        </div>
+        <div style="background:var(--s2);border-radius:10px;padding:16px;text-align:center">
+          <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Bonus Stamps Given</div>
+          <div style="font-family:'DM Mono',monospace;font-size:28px;color:var(--gold)" id="rf-bonus-total">0</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+        <div class="field">
+          <label class="label">推荐人奖励 Referrer bonus stamps</label>
+          <input class="input" id="rf-bonus-referrer" type="number" min="1" max="50" value="3">
+        </div>
+        <div class="field">
+          <label class="label">被推荐人奖励 Referee bonus stamps</label>
+          <input class="input" id="rf-bonus-referee" type="number" min="1" max="50" value="1">
+        </div>
+      </div>
+      <button class="btn btn-gold btn-sm" style="width:auto;margin-top:10px" onclick="saveReferralSettings()"><i class="ti ti-check" aria-hidden="true"></i> Save Referral Settings</button>
+      <div style="margin-top:16px">
+        <div style="font-size:12px;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Recent Referrals</div>
+        <div id="rf-list" style="font-size:13px;color:var(--t2)">Loading...</div>
+      </div>
+    </div>
+
     <!-- BRANCHES -->
     <div class="card">
       <div class="card-title"><i class="ti ti-building-store" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>Branches / Locations</div>
@@ -489,6 +520,7 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
       <label class="feat-row"><span><b>印章卡</b><small>集印章换奖励</small></span><input type="checkbox" id="ft-stamp"></label>
       <label class="feat-row"><span><b>存酒 Bottle Keep</b><small>酒吧存酒 / 扣量</small></span><input type="checkbox" id="ft-bottle"></label>
       <label class="feat-row"><span><b>储值券</b><small>次卡 / 储值卡</small></span><input type="checkbox" id="ft-voucher"></label>
+      <label class="feat-row"><span><b>推荐裂变 Referral</b><small>会员推荐朋友双方得奖励</small></span><input type="checkbox" id="ft-referral"></label>
       <button class="btn btn-gold btn-sm" type="button" style="width:auto;margin-top:10px" onclick="saveFeatures()"><i class="ti ti-check" aria-hidden="true"></i> 保存功能开关</button>
     </div>
 
@@ -762,6 +794,7 @@ async function showDashboard(){
   initBranding();
   initFeatures();
   if(S.merchant.feature_bottle){$('cellar-card').style.display='';loadCellar();}else{$('cellar-card').style.display='none';}
+  if(S.merchant.feature_referral){$('referral-card').style.display='';loadReferralSettings();}else{$('referral-card').style.display='none';}
 }
 
 async function loadStats(){
@@ -1137,14 +1170,39 @@ function initFeatures(){
   $('ft-stamp').checked=S.merchant.feature_stamp!==false;
   $('ft-bottle').checked=!!S.merchant.feature_bottle;
   $('ft-voucher').checked=!!S.merchant.feature_voucher;
+  $('ft-referral').checked=!!S.merchant.feature_referral;
 }
 async function saveFeatures(){
-  const body={feature_stamp:$('ft-stamp').checked,feature_bottle:$('ft-bottle').checked,feature_voucher:$('ft-voucher').checked};
+  const body={feature_stamp:$('ft-stamp').checked,feature_bottle:$('ft-bottle').checked,feature_voucher:$('ft-voucher').checked,feature_referral:$('ft-referral').checked};
   const res=await fetch(API+'/api/merchant/'+S.merchant.slug+'/features',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   if(!res.ok){toast('保存失败');return;}
   Object.assign(S.merchant,body);
   if(S.merchant.feature_bottle){$('cellar-card').style.display='';loadCellar();}else{$('cellar-card').style.display='none';}
+  if(S.merchant.feature_referral){$('referral-card').style.display='';loadReferralSettings();}else{$('referral-card').style.display='none';}
   toast('功能开关已保存！');
+}
+
+// ── REFERRAL 推荐裂变 ──────────────────────────────
+async function loadReferralSettings(){
+  $('rf-bonus-referrer').value=S.merchant.referral_bonus_referrer||3;
+  $('rf-bonus-referee').value=S.merchant.referral_bonus_referee||1;
+  try{
+    const data=await fetch(API+'/api/referrals/'+S.merchant.id).then(r=>r.json());
+    const list=data.referrals||[];
+    $('rf-total').textContent=list.length;
+    $('rf-bonus-total').textContent=list.reduce((s,r)=>(s+(r.referrer_bonus||0)+(r.referee_bonus||0)),0);
+    if(!list.length){$('rf-list').innerHTML='<span style="color:var(--t3)">No referrals yet</span>';return;}
+    $('rf-list').innerHTML=list.slice(0,20).map(r=>'<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--b1)"><span>'+esc(r.referrer_name||'—')+' → '+esc(r.referee_name||'—')+'</span><span style="color:var(--t3);font-size:12px">'+new Date(r.created_at).toLocaleDateString()+'</span></div>').join('');
+  }catch(e){$('rf-list').innerHTML='<span style="color:var(--t3)">Could not load referrals</span>';}
+}
+async function saveReferralSettings(){
+  const referrer=parseInt($('rf-bonus-referrer').value)||3;
+  const referee=parseInt($('rf-bonus-referee').value)||1;
+  const res=await fetch(API+'/api/merchant/'+S.merchant.slug+'/referral',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({referral_bonus_referrer:referrer,referral_bonus_referee:referee})});
+  if(!res.ok){toast('保存失败');return;}
+  S.merchant.referral_bonus_referrer=referrer;
+  S.merchant.referral_bonus_referee=referee;
+  toast('Referral settings saved!');
 }
 
 // ── 酒窖 CELLAR ──────────────────────────────

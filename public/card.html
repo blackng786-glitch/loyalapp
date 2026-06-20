@@ -335,6 +335,7 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
     <button class="tab" data-pane="bottles" onclick="mTab('bottles')" id="tab-bottles" style="display:none"><i class="ti ti-bottle" style="font-size:13px;vertical-align:-1px" aria-hidden="true"></i> Bottles</button>
     <button class="tab" data-pane="rewards" onclick="mTab('rewards')">Rewards</button>
     <button class="tab" data-pane="history" onclick="mTab('history')">History</button>
+    <button class="tab" data-pane="referral" onclick="mTab('referral')" id="tab-referral" style="display:none"><i class="ti ti-gift" style="font-size:13px;vertical-align:-1px" aria-hidden="true"></i> Refer</button>
     <button class="tab" data-pane="qr" onclick="mTab('qr')">My QR</button>
   </div>
   <div class="pane on" id="tp-stamps">
@@ -363,6 +364,29 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
   </div>
   <div class="pane" id="tp-rewards"><div id="rewards-wrap"></div></div>
   <div class="pane" id="tp-history"><div id="history-wrap"><div class="loader"><i class="ti ti-loader-2" aria-hidden="true"></i></div></div></div>
+  <div class="pane" id="tp-referral">
+    <div class="box" style="text-align:center">
+      <div style="font-size:28px;margin-bottom:6px"><i class="ti ti-gift" aria-hidden="true" style="color:var(--brand)"></i></div>
+      <div class="box-ttl" style="margin-bottom:4px">Share & Earn</div>
+      <div style="font-size:13px;color:var(--t2);margin-bottom:16px">Invite friends and you both earn bonus stamps!</div>
+      <div style="background:var(--s1);border:1px dashed var(--b3);border-radius:var(--rs);padding:14px;margin-bottom:10px">
+        <div style="font-size:11px;color:var(--t3);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Your referral code</div>
+        <div style="font-family:'DM Mono',monospace;font-size:22px;letter-spacing:3px;color:var(--brand)" id="ref-code">---</div>
+      </div>
+      <button class="btn btn-brand" onclick="copyRefLink()" style="margin-bottom:12px"><i class="ti ti-copy" aria-hidden="true"></i> Copy referral link</button>
+      <button class="btn btn-outline" onclick="shareRefLink()" id="ref-share-btn" style="display:none"><i class="ti ti-share" aria-hidden="true"></i> Share</button>
+    </div>
+    <div class="box">
+      <div style="display:flex;justify-content:space-around;text-align:center;margin-bottom:12px">
+        <div><div style="font-family:'DM Mono',monospace;font-size:24px;color:var(--brand)" id="ref-count">0</div><div style="font-size:11px;color:var(--t3)">Friends referred</div></div>
+        <div><div style="font-family:'DM Mono',monospace;font-size:24px;color:var(--brand)" id="ref-bonus">0</div><div style="font-size:11px;color:var(--t3)">Bonus stamps earned</div></div>
+      </div>
+      <div style="font-size:13px;color:var(--t2);line-height:1.7">
+        <div style="margin-bottom:4px"><i class="ti ti-circle-check" style="color:var(--brand)" aria-hidden="true"></i> You get <b id="ref-r-bonus">3</b> bonus stamps per referral</div>
+        <div><i class="ti ti-circle-check" style="color:var(--brand)" aria-hidden="true"></i> Your friend gets <b id="ref-e-bonus">1</b> welcome stamp</div>
+      </div>
+    </div>
+  </div>
   <div class="pane" id="tp-qr">
     <div class="qr-wrap">
       <div class="qr-frame"><div id="qr-canvas"></div></div>
@@ -586,6 +610,7 @@ async function completeRegistration(){
     const data=await res.json();
     if(!res.ok){$('nn-err').textContent=data.error||t('注册失败');return;}
     await loginWithMember(data,data.token);
+    claimReferral(data.id);
     toast('Welcome, '+name.split(' ')[0]+'!');
   }catch(e){$('nn-err').textContent=t('网络错误');}
   finally{btn.disabled=false;btn.innerHTML='<i class="ti ti-check"></i> '+t('完成注册');}
@@ -670,6 +695,13 @@ function renderMemberView(){
   const btTab=$('tab-bottles');
   if(btTab){btTab.style.display=m.feature_bottle?'':'none';}
   if(m.feature_bottle)loadBottleData();
+  const rfTab=$('tab-referral');
+  if(rfTab){rfTab.style.display=m.feature_referral?'':'none';}
+  if(m.feature_referral){
+    $('ref-r-bonus').textContent=m.referral_bonus_referrer||3;
+    $('ref-e-bonus').textContent=m.referral_bonus_referee||1;
+    loadReferralData();
+  }
 }
 
 function renderRewards(m,total,pts,free){
@@ -801,6 +833,47 @@ function renderVouchers(list){
       +'<div class="v-body"><div class="v-label">'+esc(v.label||(v.type==='session'?t('次卡(按次)'):t('储值(按金额)')))+'</div>'+exp+'</div>'
       +'<div class="v-rem"><div class="v-rem-val">'+(+v.remaining)+'</div><div class="v-rem-lbl">'+t('剩余')+unit+'</div></div></div>';
   }).join('');
+}
+
+// ── REFERRAL ────────────────────────────────────────────────
+async function loadReferralData(){
+  try{
+    const [codeRes,statsRes]=await Promise.all([
+      fetch(API+'/api/referral/code/'+S.member.id),
+      fetch(API+'/api/referral/stats/'+S.member.id)
+    ]);
+    if(codeRes.ok){const d=await codeRes.json();S.refCode=d.referral_code;$('ref-code').textContent=d.referral_code;}
+    if(statsRes.ok){const d=await statsRes.json();$('ref-count').textContent=d.count||0;$('ref-bonus').textContent=d.totalBonus||0;}
+  }catch(e){}
+  if(navigator.share)$('ref-share-btn').style.display='';
+}
+
+function getRefLink(){
+  return location.origin+'/card?m='+S.slug+'&ref='+(S.refCode||'');
+}
+
+function copyRefLink(){
+  const link=getRefLink();
+  navigator.clipboard.writeText(link).then(()=>toast(t('Referral link copied!'))).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=link;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);toast(t('Referral link copied!'));
+  });
+}
+
+async function shareRefLink(){
+  try{await navigator.share({title:S.merchant.name,text:'Join '+S.merchant.name+' and get bonus stamps!',url:getRefLink()});}catch(e){}
+}
+
+async function claimReferral(memberId){
+  const ref=new URLSearchParams(location.search).get('ref');
+  if(!ref)return;
+  try{
+    const lu=await fetch(API+'/api/referral/lookup?code='+encodeURIComponent(ref)+'&merchantId='+encodeURIComponent(S.merchant.id));
+    if(!lu.ok)return;
+    const referrer=await lu.json();
+    if(referrer.id===memberId)return;
+    await fetch(API+'/api/referral/claim',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({referrerId:referrer.id,refereeId:memberId,merchantId:S.merchant.id})});
+    toast(t('Welcome bonus stamps added!'));
+  }catch(e){}
 }
 
 let _tt;function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('on');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('on'),2500);}

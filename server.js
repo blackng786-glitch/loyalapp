@@ -267,6 +267,9 @@ app.get('/api/merchant/:slug', async (req, res) => {
     feature_stamp: data.feature_stamp !== false,      // 默认开
     feature_bottle: !!data.feature_bottle,            // 默认关
     feature_voucher: !!data.feature_voucher,          // 默认关
+    feature_referral: !!data.feature_referral,
+    referral_bonus_referrer: data.referral_bonus_referrer || 3,
+    referral_bonus_referee: data.referral_bonus_referee || 1,
     stamp_goal: data.stamps_per_card,
     reward_text: data.reward_value ? `${data.reward_name} (${data.reward_value})` : data.reward_name,
   });
@@ -1011,6 +1014,109 @@ async function handleStripeWebhook(req, res) {
   res.json({ received: true });
 }
 
+// ── REFERRAL PROGRAM ─────────────────────────────────────────
+function genRefCode() { return 'REF-' + crypto.randomBytes(3).toString('hex').toUpperCase(); }
+
+// Get or create referral code for a member
+app.get('/api/referral/code/:memberId', async (req, res) => {
+  const mt = getMember(req);
+  if (!mt || mt.memberId !== req.params.memberId) return res.status(401).json({ error: '未授权' });
+  const { data: member } = await db.from('members').select('referral_code,merchant_id').eq('id', req.params.memberId).maybeSingle();
+  if (!member) return res.status(404).json({ error: 'Member not found' });
+  if (member.referral_code) return res.json({ code: member.referral_code });
+  let code = genRefCode();
+  for (let i = 0; i < 5; i++) {
+    const { error } = await db.from('members').update({ referral_code: code }).eq('id', req.params.memberId);
+    if (!error) return res.json({ code });
+    code = genRefCode();
+  }
+  res.status(500).json({ error: 'Failed to generate code' });
+});
+
+// Lookup referrer by code (public, used during registration)
+app.get('/api/referral/lookup', async (req, res) => {
+  const { code, merchantId } = req.query;
+  if (!code || !merchantId) return res.json({ valid: false });
+  const { data } = await db.from('members').select('id,name')
+    .eq('referral_code', code.toUpperCase()).eq('merchant_id', merchantId).maybeSingle();
+  if (!data) return res.json({ valid: false });
+  res.json({ valid: true, referrerName: data.name });
+});
+
+// Claim referral bonus (called after new member registers with ref code)
+app.post('/api/referral/claim', async (req, res) => {
+  const { referralCode, refereeId, merchantId } = req.body;
+  if (!referralCode || !refereeId || !merchantId) return res.status(400).json({ error: 'referralCode, refereeId, merchantId required' });
+  const mt = getMember(req);
+  if (!mt || mt.memberId !== refereeId) return res.status(401).json({ error: '未授权' });
+
+  const { data: merchant } = await db.from('merchants').select('feature_referral,referral_bonus_referrer,referral_bonus_referee')
+    .eq('id', merchantId).maybeSingle();
+  if (!merchant?.feature_referral) return res.status(400).json({ error: 'Referral program not enabled' });
+
+  const { data: referrer } = await db.from('members').select('id')
+    .eq('referral_code', referralCode.toUpperCase()).eq('merchant_id', merchantId).maybeSingle();
+  if (!referrer) return res.status(400).json({ error: 'Invalid referral code' });
+  if (referrer.id === refereeId) return res.status(400).json({ error: 'Cannot refer yourself' });
+
+  const { data: existing } = await db.from('referrals').select('id')
+    .eq('referee_id', refereeId).eq('merchant_id', merchantId).maybeSingle();
+  if (existing) return res.status(409).json({ error: 'Referral already claimed' });
+
+  const bonusR = merchant.referral_bonus_referrer || 3;
+  const bonusE = merchant.referral_bonus_referee || 1;
+
+  const { error } = await db.from('referrals').insert({
+    merchant_id: merchantId, referrer_id: referrer.id, referee_id: refereeId,
+    referrer_bonus: bonusR, referee_bonus: bonusE,
+  });
+  if (error) return res.status(400).json({ error: safeDbError(error) });
+
+  const stampInserts = [];
+  for (let i = 0; i < bonusR; i++) stampInserts.push({ member_id: referrer.id, merchant_id: merchantId, service: 'Referral bonus', branch: 'Referral' });
+  for (let i = 0; i < bonusE; i++) stampInserts.push({ member_id: refereeId, merchant_id: merchantId, service: 'Welcome referral bonus', branch: 'Referral' });
+  if (stampInserts.length) await db.from('stamps').insert(stampInserts);
+
+  notifyMember(referrer.id, '🎉 Referral reward!', `Someone joined using your code! You earned ${bonusR} bonus stamp${bonusR > 1 ? 's' : ''}.`).catch(() => {});
+
+  res.json({ success: true, referrerBonus: bonusR, refereeBonus: bonusE });
+});
+
+// Member's own referral stats
+app.get('/api/referral/stats/:memberId', async (req, res) => {
+  const mt = getMember(req);
+  if (!mt || mt.memberId !== req.params.memberId) return res.status(401).json({ error: '未授权' });
+  const { data: refs } = await db.from('referrals').select('id,referee_id,referrer_bonus,created_at')
+    .eq('referrer_id', req.params.memberId).order('created_at', { ascending: false });
+  res.json({ totalReferrals: refs?.length || 0, totalBonus: (refs || []).reduce((s, r) => s + r.referrer_bonus, 0), referrals: refs || [] });
+});
+
+// Merchant referral overview
+app.get('/api/referrals/:merchantId', async (req, res) => {
+  const m = await requireMerchant(req, res, req.params.merchantId);
+  if (!m) return;
+  const { data } = await db.from('referrals').select('*,referrer:referrer_id(name,phone),referee:referee_id(name,phone)')
+    .eq('merchant_id', req.params.merchantId).order('created_at', { ascending: false }).limit(100);
+  const total = data?.length || 0;
+  const totalStamps = (data || []).reduce((s, r) => s + r.referrer_bonus + r.referee_bonus, 0);
+  res.json({ referrals: data || [], total, totalBonusStamps: totalStamps });
+});
+
+// Update referral settings (merchant)
+app.put('/api/merchant/:slug/referral', async (req, res) => {
+  const m = await requireMerchantBySlug(req, res, req.params.slug);
+  if (!m) return;
+  const { feature_referral, referral_bonus_referrer, referral_bonus_referee } = req.body;
+  const patch = {};
+  if (feature_referral !== undefined) patch.feature_referral = !!feature_referral;
+  if (referral_bonus_referrer !== undefined) patch.referral_bonus_referrer = Math.min(20, Math.max(1, parseInt(referral_bonus_referrer) || 3));
+  if (referral_bonus_referee !== undefined) patch.referral_bonus_referee = Math.min(20, Math.max(0, parseInt(referral_bonus_referee) || 1));
+  if (!Object.keys(patch).length) return res.status(400).json({ error: 'nothing to update' });
+  const { error } = await db.from('merchants').update(patch).eq('slug', req.params.slug);
+  if (error) return res.status(400).json({ error: safeDbError(error) });
+  res.json({ success: true });
+});
+
 // ── AUTO CAMPAIGNS CRUD ──────────────────────────────────────
 app.get('/api/auto-campaigns/:merchantId', async (req, res) => {
   const m = await requireMerchant(req, res, req.params.merchantId);
@@ -1182,11 +1288,12 @@ app.get('/api/security-events/:merchantId', async (req, res) => {
 app.put('/api/merchant/:slug/features', async (req, res) => {
   const m = await requireMerchantBySlug(req, res, req.params.slug);
   if (!m) return;
-  const { feature_stamp, feature_bottle, feature_voucher } = req.body;
+  const { feature_stamp, feature_bottle, feature_voucher, feature_referral } = req.body;
   const patch = {};
   if (feature_stamp !== undefined) patch.feature_stamp = !!feature_stamp;
   if (feature_bottle !== undefined) patch.feature_bottle = !!feature_bottle;
   if (feature_voucher !== undefined) patch.feature_voucher = !!feature_voucher;
+  if (feature_referral !== undefined) patch.feature_referral = !!feature_referral;
   if (!Object.keys(patch).length) return res.status(400).json({ error: 'nothing to update' });
   const { error } = await db.from('merchants').update(patch).eq('slug', req.params.slug);
   if (error) return res.status(400).json({ error: safeDbError(error) });
