@@ -272,6 +272,8 @@ canvas#scan-canvas{display:none}
     <div class="modal-title">Add Stamp</div>
     <div class="modal-sub">Member: <strong id="modal-name"></strong></div>
     <select class="modal-select" id="modal-svc"></select>
+    <input class="modal-select" id="modal-amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Amount spent (RM)" style="display:none">
+    <div id="modal-amount-hint" style="display:none;font-size:11px;color:var(--t3,#888);margin:-4px 2px 8px;text-align:left">For member tier (spending) — leave blank if N/A</div>
     <div class="modal-btns">
       <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button class="btn btn-brand" onclick="doStamp()"><i class="ti ti-check" aria-hidden="true"></i> Confirm Stamp</button>
@@ -472,14 +474,21 @@ async function handleQR(data){
 function openStamp(id,name){
   pendingMemberId=id;pendingMemberName=name;
   $('modal-name').textContent=name;
+  const showAmt=!!(S.merchant&&S.merchant.feature_tiers);
+  $('modal-amount').style.display=showAmt?'block':'none';
+  $('modal-amount-hint').style.display=showAmt?'block':'none';
+  $('modal-amount').value='';
   $('stamp-modal').classList.add('on');
 }
 function closeModal(){$('stamp-modal').classList.remove('on');}
 
 async function doStamp(){
-  const svc=$('modal-svc').value;closeModal();
+  const svc=$('modal-svc').value;
+  const amtRaw=$('modal-amount').value;
+  const amount=amtRaw?Math.max(0,parseFloat(amtRaw)||0):0;
+  closeModal();
   const bsel=$('staff-branch');const branch=bsel&&bsel.style.display!=='none'?bsel.value:undefined;
-  const res=await fetch(API+'/api/stamp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({memberId:pendingMemberId,merchantId:S.merchant.id,service:svc,staffPin:S.staff.pin,branch})});
+  const res=await fetch(API+'/api/stamp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({memberId:pendingMemberId,merchantId:S.merchant.id,service:svc,staffPin:S.staff.pin,branch,amount})});
   if(res.ok){toast('Stamp added for '+pendingMemberName);loadAllMembers();}
   else toast('Error adding stamp');
 }

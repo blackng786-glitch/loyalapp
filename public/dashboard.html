@@ -524,6 +524,47 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
       <button class="btn btn-gold btn-sm" type="button" style="width:auto;margin-top:10px" onclick="saveFeatures()"><i class="ti ti-check" aria-hidden="true"></i> 保存功能开关</button>
     </div>
 
+    <!-- 会员等级 TIERS -->
+    <div class="card" id="tiers-card">
+      <div class="card-title"><i class="ti ti-crown" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>会员等级 Member Tiers</div>
+      <div class="card-sub">按累计消费自动升级；点会员列表里的人可手动调整并查看升级记录</div>
+      <label class="feat-row"><span><b>启用等级系统</b><small>开启后，员工盖章时会要求输入消费金额</small></span><input type="checkbox" id="ft-tiers"></label>
+      <div style="font-size:11px;color:var(--t3,#888);margin:12px 2px 6px">等级名称 + 累计消费门槛 (RM，从低到高)</div>
+      <div id="tier-rows" style="display:flex;flex-direction:column;gap:8px"></div>
+      <div style="margin-top:10px">
+        <button class="btn btn-outline btn-sm" type="button" style="width:auto" onclick="addTierRow()"><i class="ti ti-plus" aria-hidden="true"></i> 加一级</button>
+        <button class="btn btn-gold btn-sm" type="button" style="width:auto;margin-left:8px" onclick="saveTiers()"><i class="ti ti-check" aria-hidden="true"></i> 保存等级设置</button>
+      </div>
+    </div>
+
+    <!-- MEMBER DETAIL MODAL -->
+    <div id="member-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)closeMemberDetail()">
+      <div style="background:var(--s1,#1b1917);border:1px solid var(--b2,#36302c);border-radius:14px;max-width:440px;width:100%;max-height:85vh;overflow-y:auto;padding:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div style="font-size:18px;font-weight:600" id="md-name">—</div>
+          <button type="button" onclick="closeMemberDetail()" style="background:none;border:none;color:var(--t2,#999);font-size:20px;cursor:pointer;padding:0 4px">✕</button>
+        </div>
+        <div style="font-family:DM Mono,monospace;font-size:12px;color:var(--t2,#999);margin-bottom:14px" id="md-phone"></div>
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          <div style="flex:1;background:var(--s2,#262220);border-radius:10px;padding:12px;text-align:center">
+            <div style="font-size:11px;color:var(--t3,#888);margin-bottom:4px">当前等级</div>
+            <div style="font-size:16px;font-weight:600" id="md-tier">—</div>
+          </div>
+          <div style="flex:1;background:var(--s2,#262220);border-radius:10px;padding:12px;text-align:center">
+            <div style="font-size:11px;color:var(--t3,#888);margin-bottom:4px">累计消费</div>
+            <div style="font-size:16px;font-weight:600;font-family:DM Mono,monospace" id="md-spent">—</div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--t3,#888);margin-bottom:6px">手动调整等级</div>
+        <div style="display:flex;gap:8px;margin-bottom:18px">
+          <select id="md-tier-select" style="flex:1;padding:10px;background:var(--s2,#262220);border:1px solid var(--b2,#36302c);border-radius:8px;color:var(--t1,#eee);font-size:14px"></select>
+          <button class="btn btn-gold btn-sm" type="button" style="width:auto" onclick="changeMemberTier()"><i class="ti ti-check" aria-hidden="true"></i> 更改</button>
+        </div>
+        <div style="font-size:12px;color:var(--t3,#888);margin-bottom:8px">等级变动记录（几时 · 谁改的）</div>
+        <div id="md-history" style="display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+    </div>
+
     <!-- BRANDING 品牌设置 -->
     <div class="card">
       <div class="card-title"><i class="ti ti-palette" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>Branding 品牌设置</div>
@@ -793,6 +834,7 @@ async function showDashboard(){
   loadAutoCampaigns();
   initBranding();
   initFeatures();
+  initTiers();
   if(S.merchant.feature_bottle){$('cellar-card').style.display='';loadCellar();}else{$('cellar-card').style.display='none';}
   if(S.merchant.feature_referral){$('referral-card').style.display='';loadReferralSettings();}else{$('referral-card').style.display='none';}
 }
@@ -832,7 +874,7 @@ function renderMembersTable(members){
     const pts=m.stampCount*10;
     const joined=new Date(m.created_at).toLocaleDateString('en-MY',{day:'numeric',month:'short',year:'numeric'});
     const col=tierColors[m.tier]||'#CD7F32';
-    return '<tr><td style="font-weight:500">'+esc(m.name)+'</td><td style="font-family:DM Mono,monospace;font-size:12px;color:var(--t2)">'+esc(m.phone)+'</td><td><span style="display:inline-flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:'+col+';display:inline-block"></span>'+esc(m.tier)+'</span></td><td style="font-family:DM Mono,monospace;color:var(--gold)">'+m.stampCount+'</td><td style="font-family:DM Mono,monospace;color:var(--t2)">'+pts+'</td><td style="font-size:12px;color:var(--t3)">'+joined+'</td></tr>';
+    return '<tr onclick="openMemberDetail(\''+m.id+'\')" style="cursor:pointer"><td style="font-weight:500">'+esc(m.name)+'</td><td style="font-family:DM Mono,monospace;font-size:12px;color:var(--t2)">'+esc(m.phone)+'</td><td><span style="display:inline-flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:'+col+';display:inline-block"></span>'+esc(m.tier)+'</span></td><td style="font-family:DM Mono,monospace;color:var(--gold)">'+m.stampCount+'</td><td style="font-family:DM Mono,monospace;color:var(--t2)">'+pts+'</td><td style="font-size:12px;color:var(--t3)">'+joined+'</td></tr>';
   }).join('');
 }
 
@@ -1180,6 +1222,76 @@ async function saveFeatures(){
   if(S.merchant.feature_bottle){$('cellar-card').style.display='';loadCellar();}else{$('cellar-card').style.display='none';}
   if(S.merchant.feature_referral){$('referral-card').style.display='';loadReferralSettings();}else{$('referral-card').style.display='none';}
   toast('功能开关已保存！');
+}
+
+// ── 会员等级 TIERS ──────────────────────────────
+const TIER_FALLBACK=[{name:'Bronze',min:0},{name:'Silver',min:500},{name:'Gold',min:2000},{name:'Platinum',min:5000}];
+function tierRowHtml(name,min){
+  return '<div class="tier-row" style="display:flex;gap:8px;align-items:center">'+
+    '<input type="text" placeholder="等级名" value="'+esc(name||'')+'" maxlength="30" style="flex:2;min-width:0;padding:9px;background:var(--s2,#262220);border:1px solid var(--b2,#36302c);border-radius:8px;color:var(--t1,#eee)">'+
+    '<input type="number" min="0" step="1" placeholder="RM" value="'+(min!=null&&min!==''?Number(min):'')+'" style="flex:1;min-width:0;padding:9px;background:var(--s2,#262220);border:1px solid var(--b2,#36302c);border-radius:8px;color:var(--t1,#eee);font-family:DM Mono,monospace">'+
+    '<button type="button" title="删除" onclick="this.closest(\'.tier-row\').remove()" style="background:none;border:none;color:var(--t3,#888);cursor:pointer;font-size:18px;padding:4px;flex:none">✕</button>'+
+  '</div>';
+}
+function addTierRow(name,min){$('tier-rows').insertAdjacentHTML('beforeend',tierRowHtml(name,min));}
+function initTiers(){
+  $('ft-tiers').checked=!!S.merchant.feature_tiers;
+  const cfg=(S.merchant.tier_config&&S.merchant.tier_config.length)?S.merchant.tier_config:TIER_FALLBACK;
+  $('tier-rows').innerHTML='';
+  cfg.forEach(t=>addTierRow(t.name,t.min));
+}
+async function saveTiers(){
+  const rows=[...document.querySelectorAll('#tier-rows .tier-row')];
+  const tier_config=rows.map(r=>{const i=r.querySelectorAll('input');return {name:i[0].value.trim(),min:Math.max(0,parseFloat(i[1].value)||0)};}).filter(t=>t.name);
+  if(!tier_config.length){toast('至少要有一个等级');return;}
+  const res=await fetch(API+'/api/merchant/'+S.merchant.slug+'/tiers',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({feature_tiers:$('ft-tiers').checked,tier_config})});
+  if(!res.ok){const e=await res.json().catch(()=>({}));toast(e.error||'保存失败');return;}
+  S.merchant.feature_tiers=$('ft-tiers').checked;S.merchant.tier_config=tier_config;
+  toast('等级设置已保存！');
+}
+
+// ── 会员详情 / 手动改等级 / 升级记录 ──────────────
+let mdMemberId=null;
+function tierOptions(selName){
+  const cfg=(S.merchant.tier_config&&S.merchant.tier_config.length)?S.merchant.tier_config:TIER_FALLBACK;
+  return cfg.map(t=>'<option value="'+esc(t.name)+'"'+(t.name===selName?' selected':'')+'>'+esc(t.name)+'</option>').join('');
+}
+function openMemberDetail(id){
+  const m=S.allMembers.find(x=>x.id===id);if(!m)return;
+  mdMemberId=id;
+  $('md-name').textContent=m.name;
+  $('md-phone').textContent=m.phone;
+  $('md-tier').textContent=m.tier||'Bronze';
+  $('md-spent').textContent='RM '+Number(m.total_spent||0).toFixed(2);
+  $('md-tier-select').innerHTML=tierOptions(m.tier||'Bronze');
+  $('md-history').innerHTML='<div style="color:var(--t3,#888);font-size:12px">加载中…</div>';
+  $('member-modal').style.display='flex';
+  loadTierHistory(id);
+}
+function closeMemberDetail(){$('member-modal').style.display='none';mdMemberId=null;}
+async function loadTierHistory(id){
+  const data=await fetch(API+'/api/member/'+id+'/tier-history?merchantId='+S.merchant.id).then(r=>r.json()).catch(()=>[]);
+  const box=$('md-history');
+  if(!data||!data.length){box.innerHTML='<div style="color:var(--t3,#888);font-size:12px">暂无变动记录</div>';return;}
+  box.innerHTML=data.map(h=>{
+    const when=new Date(h.created_at).toLocaleString('en-MY',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    const tag=h.reason==='manual'?'<span style="color:#E0795B">人工</span>':'<span style="color:#4A9E6A">自动</span>';
+    return '<div style="background:var(--s2,#262220);border-radius:8px;padding:10px;font-size:13px">'+
+      '<div style="display:flex;justify-content:space-between;gap:8px"><span>'+esc(h.old_tier||'—')+' → <b>'+esc(h.new_tier)+'</b></span>'+tag+'</div>'+
+      '<div style="font-size:11px;color:var(--t3,#888);margin-top:3px">'+when+(h.changed_by?' · '+esc(h.changed_by):'')+'</div>'+
+    '</div>';
+  }).join('');
+}
+async function changeMemberTier(){
+  if(!mdMemberId)return;
+  const tier=$('md-tier-select').value;
+  const res=await fetch(API+'/api/member/'+mdMemberId+'/tier',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({merchantId:S.merchant.id,tier})});
+  if(!res.ok){const e=await res.json().catch(()=>({}));toast(e.error||'更改失败');return;}
+  const m=S.allMembers.find(x=>x.id===mdMemberId);if(m){m.tier=tier;}
+  $('md-tier').textContent=tier;
+  renderMembersTable(S.filteredMembers);
+  loadTierHistory(mdMemberId);
+  toast('等级已更新');
 }
 
 // ── REFERRAL 推荐裂变 ──────────────────────────────

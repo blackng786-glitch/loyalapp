@@ -165,6 +165,57 @@ async function requireStaffOrMerchant(req, res, merchantId) {
   return null;
 }
 
+// ── MEMBER TIERS ─────────────────────────────────────────────
+const DEFAULT_TIERS = [
+  { name: 'Bronze', min: 0 },
+  { name: 'Silver', min: 500 },
+  { name: 'Gold', min: 2000 },
+  { name: 'Platinum', min: 5000 },
+];
+const sortedTiers = (cfg) =>
+  (Array.isArray(cfg) && cfg.length ? cfg : DEFAULT_TIERS)
+    .slice().sort((a, b) => (Number(a.min) || 0) - (Number(b.min) || 0));
+
+// Highest tier whose min threshold is <= spent.
+function computeTier(totalSpent, cfg) {
+  const tiers = sortedTiers(cfg);
+  let result = tiers[0].name;
+  for (const t of tiers) if (Number(totalSpent) >= (Number(t.min) || 0)) result = t.name;
+  return result;
+}
+// Rank by position in the ascending-threshold list (higher = better tier).
+function tierRank(name, cfg) {
+  const i = sortedTiers(cfg).findIndex(t => t.name === name);
+  return i < 0 ? 0 : i;
+}
+
+// Add a purchase amount to a member's lifetime spend and auto-upgrade tier
+// (upgrades only — never auto-downgrades). Logs upgrades to tier_history.
+async function applySpendAndTier(memberId, merchantId, amount, changedBy) {
+  const amt = Number(amount) || 0;
+  const [{ data: member }, { data: merchant }] = await Promise.all([
+    db.from('members').select('total_spent,tier').eq('id', memberId).maybeSingle(),
+    db.from('merchants').select('tier_config,feature_tiers').eq('id', merchantId).maybeSingle(),
+  ]);
+  if (!member) return;
+  const newSpent = Number(member.total_spent || 0) + amt;
+  const updates = { total_spent: newSpent };
+  if (merchant && merchant.feature_tiers && amt > 0) {
+    const cfg = merchant.tier_config;
+    const curTier = member.tier || computeTier(0, cfg);
+    const newTier = computeTier(newSpent, cfg);
+    if (tierRank(newTier, cfg) > tierRank(curTier, cfg)) {
+      updates.tier = newTier;
+      updates.tier_updated_at = new Date().toISOString();
+      await db.from('tier_history').insert({
+        merchant_id: merchantId, member_id: memberId,
+        old_tier: curTier, new_tier: newTier, reason: 'auto', changed_by: changedBy || 'system',
+      });
+    }
+  }
+  await db.from('members').update(updates).eq('id', memberId);
+}
+
 // ── RATE LIMIT (内存滑动窗口, 单实例部署够用) ──────────────────
 const rlMap = new Map();
 function rateOk(key, windowMs, max) {
@@ -293,6 +344,8 @@ app.get('/api/merchant/:slug', async (req, res) => {
     feature_referral: !!data.feature_referral,
     referral_bonus_referrer: data.referral_bonus_referrer || 3,
     referral_bonus_referee: data.referral_bonus_referee || 1,
+    feature_tiers: !!data.feature_tiers,
+    tier_config: Array.isArray(data.tier_config) ? data.tier_config : DEFAULT_TIERS,
     stamp_goal: data.stamps_per_card,
     reward_text: data.reward_value ? `${data.reward_name} (${data.reward_value})` : data.reward_name,
   });
@@ -607,18 +660,23 @@ app.get('/api/members/all', async (req, res) => {
 
 // ── ADD STAMP ────────────────────────────────────────────────
 app.post('/api/stamp', async (req, res) => {
-  const { memberId, merchantId, service, staffPin, branch } = req.body;
+  const { memberId, merchantId, service, staffPin, branch, amount } = req.body;
   const lenErr = checkLen([[service, LIMITS.service, '服务'], [branch, LIMITS.branch, '分店']]);
   if (lenErr) return res.status(400).json({ error: lenErr });
+  const amt = Math.max(0, Math.min(1e7, Number(amount) || 0));   // clamp 0..10M
   const { data: allStaff } = await db.from('staff').select('*').eq('merchant_id', merchantId);
   const staff = await matchStaffPin(allStaff, staffPin);
   if (!staff) return res.status(401).json({ error: 'Invalid PIN' });
 
   const { data, error } = await db.from('stamps').insert({
     member_id: memberId, merchant_id: merchantId,
-    service, branch: branch || staff.branch, staff_name: staff.name,
+    service, branch: branch || staff.branch, staff_name: staff.name, amount: amt,
   }).select().single();
   if (error) return res.status(400).json({ error: safeDbError(error) });
+
+  // Accumulate spend + auto-upgrade tier (non-blocking-safe; awaited so the
+  // member row is consistent before the dashboard refetches)
+  await applySpendAndTier(memberId, merchantId, amt, staff.name);
 
   // Send push notification (non-blocking)
   notifyMember(memberId, '⭐ Stamp collected!', `You visited ${service}. Keep it up!`).catch(() => {});
@@ -1177,6 +1235,65 @@ app.patch('/api/member/:id/birthday', async (req, res) => {
   if (!auth) return;
   if (birthday && !/^\d{2}-\d{2}$/.test(birthday)) return res.status(400).json({ error: 'birthday format: MM-DD' });
   const { error } = await db.from('members').update({ birthday: birthday || null }).eq('id', req.params.id).eq('merchant_id', merchantId);
+  if (error) return res.status(400).json({ error: safeDbError(error) });
+  res.json({ success: true });
+});
+
+// ── MEMBER TIER: manual change + history ─────────────────────
+app.patch('/api/member/:id/tier', async (req, res) => {
+  const { merchantId, tier } = req.body;
+  if (!merchantId) return res.status(400).json({ error: 'merchantId required' });
+  const auth = await requireStaffOrMerchant(req, res, merchantId);
+  if (!auth) return;
+  const { data: merchant } = await db.from('merchants').select('tier_config').eq('id', merchantId).maybeSingle();
+  if (!sortedTiers(merchant && merchant.tier_config).some(t => t.name === tier))
+    return res.status(400).json({ error: 'Invalid tier' });
+  const { data: member } = await db.from('members')
+    .select('tier').eq('id', req.params.id).eq('merchant_id', merchantId).maybeSingle();
+  if (!member) return res.status(404).json({ error: 'Member not found' });
+  if (member.tier === tier) return res.json({ success: true, tier });
+  const changedBy = (auth.staff && auth.staff.name) || 'merchant';
+  const { error } = await db.from('members')
+    .update({ tier, tier_updated_at: new Date().toISOString() }).eq('id', req.params.id);
+  if (error) return res.status(400).json({ error: safeDbError(error) });
+  await db.from('tier_history').insert({
+    merchant_id: merchantId, member_id: req.params.id,
+    old_tier: member.tier, new_tier: tier, reason: 'manual', changed_by: changedBy,
+  });
+  res.json({ success: true, tier });
+});
+
+app.get('/api/member/:id/tier-history', async (req, res) => {
+  const merchantId = req.query.merchantId;
+  const auth = await requireStaffOrMerchant(req, res, merchantId);
+  if (!auth) return;
+  const { data } = await db.from('tier_history')
+    .select('old_tier,new_tier,reason,changed_by,created_at')
+    .eq('member_id', req.params.id).eq('merchant_id', merchantId)
+    .order('created_at', { ascending: false }).limit(50);
+  res.json(data || []);
+});
+
+// ── MERCHANT TIER SETTINGS ───────────────────────────────────
+app.put('/api/merchant/:slug/tiers', async (req, res) => {
+  const m = await requireMerchantBySlug(req, res, req.params.slug);
+  if (!m) return;
+  const { feature_tiers, tier_config } = req.body;
+  const patch = {};
+  if (feature_tiers !== undefined) patch.feature_tiers = !!feature_tiers;
+  if (tier_config !== undefined) {
+    if (!Array.isArray(tier_config) || tier_config.length < 1 || tier_config.length > 6)
+      return res.status(400).json({ error: 'tier_config must have 1–6 tiers' });
+    const clean = [];
+    for (const t of tier_config) {
+      const name = String((t && t.name) || '').trim().slice(0, 30);
+      if (!name) return res.status(400).json({ error: 'each tier needs a name' });
+      clean.push({ name, min: Math.max(0, Math.min(1e9, Number(t.min) || 0)) });
+    }
+    patch.tier_config = clean;
+  }
+  if (!Object.keys(patch).length) return res.status(400).json({ error: 'nothing to update' });
+  const { error } = await db.from('merchants').update(patch).eq('slug', req.params.slug);
   if (error) return res.status(400).json({ error: safeDbError(error) });
   res.json({ success: true });
 });
