@@ -9,12 +9,13 @@ Last updated: 2026-06-25
 - [ ] (nothing yet)
 
 ## 📋 To Do
-- [ ] VAPID keys 配置到 Railway 环境变量 → re-enables push (optional now; site no longer crashes without them)
+- [ ] Re-enable push: set BOTH VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY on Railway from local .env (matching pair). Railway currently has a public key (BGZph...) with NO matching private key — that mismatch is what crashed startup. Local .env pair (BIOI...) is known-good. Optional now; site runs fine with push disabled.
 - [ ] Set Stripe env vars on Railway (when bank account approved)
 - [ ] Enable referral per merchant: Dashboard → Features → 推荐裂变 → Save
 
 ## ✅ Done
 <!-- Newest at top. Format: - [x] task (YYYY-MM-DD) -->
+- [x] FIX prod 502 part 2 (dashboard data endpoints) — root cause: analytics endpoint called `db.rpc(...).catch()` but Supabase query builders are thenables WITHOUT .catch (v2.106.2) → TypeError thrown sync in async handler → Node 22 unhandledRejection → process crash → all in-flight dashboard requests 502 (by-auth/health survived as they run before the batch & don't hit analytics). Fix: Promise.resolve(db.rpc(...)).catch(...). Added process unhandledRejection/uncaughtException handlers so one bad request can never crash the whole server again. Proven via DIAG: by-auth=200 merchant loads fine, other endpoints=502 (2026-06-25)
 - [x] FIX prod 502 (site down) — root cause: webpush.setVapidDetails() called unconditionally at startup, threw because VAPID keys were never set on Railway → crash loop. Guarded setVapidDetails + notifyMember + broadcastToMembers behind PUSH_ENABLED flag (push degrades gracefully). Also fixed loyalapp/package.json missing stripe dep. Verified boots with AND without VAPID keys (2026-06-25)
 - [x] Ran migrations v8–v11 in Supabase (production) via Claude in Chrome — chose "Run and enable RLS" (deny-by-default, server uses service_role so unaffected); verified: 3 new tables, 4 merchant cols, 2 member cols, stamp_counts_by_member fn (2026-06-20)
 - [x] Referral program 推荐裂变 — server endpoints (gen code, lookup, claim, stats, merchant overview, settings), migration-v11 (referral_code, referrals table, merchant settings), card.html referral tab (share link, copy, Web Share API, stats), dashboard referral card (toggle, bonus config, referral list), feature toggle integration (2026-06-20)

@@ -8,6 +8,17 @@ const crypto  = require('crypto');
 const Stripe  = require('stripe');
 const { createClient } = require('@supabase/supabase-js');
 
+// Safety net: a single bad request must never crash the whole server.
+// Node 15+ exits the process on an unhandled rejection by default; one
+// throwing route handler would 502 every other in-flight request. Log and
+// keep serving instead.
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason && reason.stack ? reason.stack : reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err && err.stack ? err.stack : err);
+});
+
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
 const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID || '';
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '';
@@ -1224,7 +1235,9 @@ app.get('/api/analytics/:merchantId', async (req, res) => {
     stampQ,
     db.from('members').select('id,created_at').eq('merchant_id', mid),
     db.from('redemptions').select('created_at').eq('merchant_id', mid).gte('created_at', sinceIso),
-    db.rpc('stamp_counts_by_member', { mid }).catch(() => ({ data: null })),
+    // NB: Supabase query builders are thenables WITHOUT .catch — calling
+    // .catch directly throws and crashes the process. Wrap in Promise.resolve.
+    Promise.resolve(db.rpc('stamp_counts_by_member', { mid })).catch(() => ({ data: null })),
   ]);
   const stamps = stampsR.data || [], members = membersR.data || [],
         redemptions = redeemR.data || [];
