@@ -3,18 +3,20 @@
 > Single source of truth for progress. Items under "Done" are complete and
 > verified — do not re-investigate them unless something downstream breaks.
 
-Last updated: 2026-06-20
+Last updated: 2026-06-25
 
 ## 🔵 In Progress
 - [ ] (nothing yet)
 
 ## 📋 To Do
-- [ ] VAPID keys 配置到 Railway 环境变量 (需要用户手动操作)
-- [ ] Run migration-v8, v9, v10, v11 in Supabase SQL Editor
+- [ ] VAPID keys 配置到 Railway 环境变量 → re-enables push (optional now; site no longer crashes without them)
 - [ ] Set Stripe env vars on Railway (when bank account approved)
+- [ ] Enable referral per merchant: Dashboard → Features → 推荐裂变 → Save
 
 ## ✅ Done
 <!-- Newest at top. Format: - [x] task (YYYY-MM-DD) -->
+- [x] FIX prod 502 (site down) — root cause: webpush.setVapidDetails() called unconditionally at startup, threw because VAPID keys were never set on Railway → crash loop. Guarded setVapidDetails + notifyMember + broadcastToMembers behind PUSH_ENABLED flag (push degrades gracefully). Also fixed loyalapp/package.json missing stripe dep. Verified boots with AND without VAPID keys (2026-06-25)
+- [x] Ran migrations v8–v11 in Supabase (production) via Claude in Chrome — chose "Run and enable RLS" (deny-by-default, server uses service_role so unaffected); verified: 3 new tables, 4 merchant cols, 2 member cols, stamp_counts_by_member fn (2026-06-20)
 - [x] Referral program 推荐裂变 — server endpoints (gen code, lookup, claim, stats, merchant overview, settings), migration-v11 (referral_code, referrals table, merchant settings), card.html referral tab (share link, copy, Web Share API, stats), dashboard referral card (toggle, bonus config, referral list), feature toggle integration (2026-06-20)
 - [x] CSV export (members + analytics) + auto campaigns (birthday/anniversary push, Pro only) + migration-v10 (2026-06-19)
 - [x] Stripe billing + Pro plan + SMS quota — checkout, portal, webhook, dashboard billing card, sms_usage table, OTP quota check (2026-06-19)
@@ -80,6 +82,8 @@ Last updated: 2026-06-20
 - Production URL: https://choppkar.com (custom domain) / https://loyalapp-production.up.railway.app (Railway)
 - User instruction: 不要自己执行 git push (do NOT auto-push; user may grant one-off exceptions explicitly)
 - Railway deploys from GitHub main branch (Nixpacks)
+- ⚠️ TECH DEBT: repo has DUPLICATE app copies — root (server.js, public/, package.json) AND loyalapp/ subdir mirror. Both must be edited in sync or they drift (this caused stripe to be in root package.json but missing from loyalapp/package.json). No railway.json pins the deploy dir; Railway default = repo root. Consider collapsing to one copy.
+- ⚠️ GOTCHA: webpush.setVapidDetails() throws at startup if VAPID keys missing — now guarded behind PUSH_ENABLED. Any future startup-time external init (Stripe, web-push, etc.) MUST be wrapped so optional-feature misconfig can't 502 the whole app.
 - Supabase project: https://hrwoejdyjxpohdvfzcga.supabase.co
 - Brand colors: #993C1D (primary) / #D85A30 (accent) / #FAECE7 (light)
 - migration-v3.sql = logo_url column; migration-v4.sql = bg_color column

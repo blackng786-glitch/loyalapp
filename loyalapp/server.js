@@ -217,11 +217,23 @@ setInterval(() => {
 }, 600000);
 
 // ── WEB PUSH ─────────────────────────────────────────────────
-webpush.setVapidDetails(
-  'mailto:' + process.env.CONTACT_EMAIL,
-  process.env.VAPID_PUBLIC_KEY,
-  process.env.VAPID_PRIVATE_KEY
-);
+// Push is optional. A missing/invalid VAPID config must NOT crash the server —
+// setVapidDetails() throws synchronously, so guard it and degrade gracefully.
+let PUSH_ENABLED = false;
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  try {
+    webpush.setVapidDetails(
+      'mailto:' + (process.env.CONTACT_EMAIL || 'admin@choppkar.com'),
+      process.env.VAPID_PUBLIC_KEY,
+      process.env.VAPID_PRIVATE_KEY
+    );
+    PUSH_ENABLED = true;
+  } catch (e) {
+    console.error('[web-push] VAPID init failed — push disabled:', e.message);
+  }
+} else {
+  console.warn('[web-push] VAPID keys not set — push notifications disabled. Set VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY on the host to enable.');
+}
 
 // ── DYNAMIC PWA MANIFEST (per merchant) ──────────────────────
 app.get('/manifest/:slug.json', async (req, res) => {
@@ -773,14 +785,20 @@ app.post('/api/push/winback', async (req, res) => {
 
 // ── PUSH HELPERS ──────────────────────────────────────────────
 async function notifyMember(memberId, title, body) {
+  if (!PUSH_ENABLED) return;
   const { data } = await db.from('push_subscriptions')
     .select('subscription').eq('member_id', memberId).maybeSingle();
   if (!data) return;
-  await webpush.sendNotification(data.subscription, JSON.stringify({ title, body }));
+  try {
+    await webpush.sendNotification(data.subscription, JSON.stringify({ title, body }));
+  } catch (e) {
+    if (e?.statusCode === 410) db.from('push_subscriptions').delete().eq('member_id', memberId).then(() => {}).catch(() => {});
+  }
 }
 
 // 向某商户的会员广播 (可选 memberIds 限定子集); 返回成功发送数
 async function broadcastToMembers(merchantId, title, body, memberIds) {
+  if (!PUSH_ENABLED) return 0;
   let ids = memberIds;
   if (!ids) {
     const { data: members } = await db.from('members').select('id').eq('merchant_id', merchantId);
