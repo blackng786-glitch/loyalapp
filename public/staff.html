@@ -339,7 +339,10 @@ function updDots(){document.querySelectorAll('.pd').forEach((el,i)=>el.classList
 async function checkPin(){
   const res=await fetch(API+'/api/staff/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({merchantId:S.merchant.id,pin:S.pin})});
   if(!res.ok){toast('Incorrect PIN');S.pin='';updDots();return;}
-  S.staff=await res.json();S.pin='';updDots();
+  // Server strips the (hashed) pin from the login response, but every staff
+  // API call must send the PLAINTEXT pin via the x-staff-pin header. Preserve
+  // what the user typed before clearing S.pin.
+  S.staff=await res.json();S.staff.pin=S.pin;S.pin='';updDots();
   $('s-brand').innerHTML='Choppkar <span style="font-size:12px;opacity:.65;letter-spacing:1px">· '+esc(S.merchant.logo_text||S.merchant.name)+'</span>';
   $('branch-badge').textContent=S.staff.branch;
   const sel=$('modal-svc');sel.innerHTML='';
