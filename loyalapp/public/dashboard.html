@@ -172,6 +172,20 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
 .feat-row:last-of-type{border-bottom:none}
 .feat-row b{font-size:14px}
 .feat-row small{display:block;color:var(--t3);font-size:11px;margin-top:2px}
+.plan-compare{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.plan-col{border:1px solid var(--b2);border-radius:10px;padding:14px;position:relative}
+.plan-col.featured{border:1.5px solid var(--gold)}
+.plan-col.current{box-shadow:0 0 0 2px rgba(216,90,48,0.35) inset}
+.plan-col-tag{position:absolute;top:-9px;left:14px;background:var(--gold);color:#fff;font-size:10px;padding:2px 8px;border-radius:10px}
+.plan-col-name{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3)}
+.plan-col.featured .plan-col-name{color:var(--gold)}
+.plan-col-price{font-family:'Bebas Neue',sans-serif;font-size:30px;color:var(--t1);line-height:1.1}
+.plan-col.featured .plan-col-price{color:var(--gold)}
+.plan-col-price small{font-size:13px;color:var(--t3);font-family:'DM Sans',sans-serif}
+.plan-col-sub{font-size:11px;color:var(--t3);margin:2px 0 8px}
+.plan-col ul{list-style:none;margin:0;padding:0;font-size:12px;color:var(--t2);line-height:1.85}
+.plan-col-badge{display:inline-block;margin-top:8px;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--gold);font-weight:600}
+@media(max-width:640px){.plan-compare{grid-template-columns:1fr}}
 .feat-row input[type=checkbox]{width:22px;height:22px;accent-color:var(--gold);cursor:pointer;flex-shrink:0}
 .cl-badge{font-size:10px;letter-spacing:.5px;padding:3px 9px;border-radius:20px;white-space:nowrap}
 .cl-ok{background:rgba(74,158,106,0.15);color:var(--green)}
@@ -648,10 +662,32 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
         <div class="stat"><div class="stat-lbl">SMS Used</div><div class="stat-val" id="bill-sms">0 / 50</div></div>
       </div>
       <div id="bill-status" style="font-size:13px;color:var(--t2);margin-bottom:14px"></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn" id="btn-upgrade" onclick="upgradeToProPlan()" style="background:var(--gold);color:#fff"><i class="ti ti-crown" aria-hidden="true"></i> Upgrade to Pro — RM49/mo</button>
+      <div class="plan-compare">
+        <div class="plan-col" id="plan-col-free">
+          <div class="plan-col-name">Free</div>
+          <div class="plan-col-price">RM0</div>
+          <div class="plan-col-sub">基础忠诚度</div>
+          <ul><li>印章卡 + 会员名单</li><li>手动推送 + 推荐裂变</li><li>50 短信/月 · 1 分店</li></ul>
+        </div>
+        <div class="plan-col featured" id="plan-col-pro">
+          <div class="plan-col-tag">推荐</div>
+          <div class="plan-col-name">Pro</div>
+          <div class="plan-col-price">RM49<small>/mo</small></div>
+          <div class="plan-col-sub">单店成长</div>
+          <ul><li>会员等级 + 自动营销</li><li>无限短信 + CSV 导出</li><li>进阶分析 · 最多 3 分店</li></ul>
+        </div>
+        <div class="plan-col" id="plan-col-biz">
+          <div class="plan-col-name">Business</div>
+          <div class="plan-col-price">RM99<small>/mo</small></div>
+          <div class="plan-col-sub">连锁多店</div>
+          <ul><li>无限分店 + 白标</li><li>多员工账号</li><li>优先客服</li></ul>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+        <button class="btn" id="btn-upgrade" onclick="upgradeToProPlan()" style="background:var(--gold);color:#fff;display:none"><i class="ti ti-crown" aria-hidden="true"></i> Upgrade to Pro — RM49/mo</button>
         <button class="btn" id="btn-manage" onclick="manageBilling()" style="display:none"><i class="ti ti-credit-card" aria-hidden="true"></i> Manage Billing</button>
       </div>
+      <div id="bill-soon" style="font-size:12px;color:var(--t3);margin-top:10px;display:none"><i class="ti ti-clock" aria-hidden="true"></i> 在线付款即将开放。想升级 Pro / Business 请直接联系我们。</div>
     </div>
 
     <!-- FOOTER -->
@@ -1085,20 +1121,26 @@ async function loadBilling(){
     const data=await fetch(API+'/api/billing/'+S.merchant.id).then(r=>r.json());
     const planEl=$('bill-plan'), smsEl=$('bill-sms'), statusEl=$('bill-status');
     const badge=document.querySelector('.plan-badge');
-    if(data.plan==='pro'){
-      planEl.textContent='PRO';planEl.style.color='var(--gold)';
-      if(badge){badge.textContent='Pro';badge.style.background='rgba(216,90,48,0.2)';}
-      $('btn-upgrade').style.display='none';
-      $('btn-manage').style.display='';
-      if(data.expiresAt){statusEl.textContent='Cancels on '+new Date(data.expiresAt).toLocaleDateString();}
-      else{statusEl.textContent='Active subscription';}
-    }else{
-      planEl.textContent='FREE';planEl.style.color='var(--t2)';
-      if(badge){badge.textContent='Free';}
-      $('btn-upgrade').style.display='';
-      $('btn-manage').style.display=data.hasSubscription?'':'none';
-      statusEl.textContent='';
-    }
+    const plan=data.plan||'free';
+    const paid=plan==='pro'||plan==='business';
+    planEl.textContent=plan.toUpperCase();
+    planEl.style.color=paid?'var(--gold)':'var(--t2)';
+    if(badge){badge.textContent=plan.charAt(0).toUpperCase()+plan.slice(1);if(paid)badge.style.background='rgba(216,90,48,0.2)';}
+    if(paid){
+      statusEl.textContent=data.expiresAt?('Cancels on '+new Date(data.expiresAt).toLocaleDateString()):'Active subscription';
+    }else{statusEl.textContent='';}
+    // highlight current plan column
+    [['plan-col-free','free'],['plan-col-pro','pro'],['plan-col-biz','business']].forEach(function(p){
+      const col=$(p[0]);if(!col)return;
+      const old=col.querySelector('.plan-col-badge');if(old)old.remove();
+      if(plan===p[1]){col.classList.add('current');const b=document.createElement('div');b.className='plan-col-badge';b.textContent='✓ 当前方案';col.appendChild(b);}
+      else{col.classList.remove('current');}
+    });
+    // upgrade button only when Stripe is live; otherwise show "coming soon"
+    const canBuy=!!data.billingEnabled;
+    $('btn-upgrade').style.display=(canBuy&&!paid)?'':'none';
+    $('btn-manage').style.display=(canBuy&&(data.hasSubscription||paid))?'':'none';
+    $('bill-soon').style.display=(!canBuy&&!paid)?'':'none';
     var smsLimit=data.sms?.limit==='unlimited'?'∞':data.sms?.limit||50;
     smsEl.textContent=(data.sms?.used||0)+' / '+smsLimit;
     if(data.sms?.used>=data.sms?.limit&&data.sms?.limit!=='unlimited'){smsEl.style.color='#E24B4A';}else{smsEl.style.color='';}

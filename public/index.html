@@ -89,6 +89,19 @@ a{text-decoration:none;color:inherit}
 .price-list li{padding:10px 0;border-bottom:1px solid rgba(0,0,0,0.05);font-size:15px;display:flex;align-items:center;gap:10px}
 .price-list li:last-child{border-bottom:none}
 .price-list i{color:#1D9E75;font-size:18px}
+.price-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:1000px;margin:0 auto;align-items:stretch}
+.tier{background:var(--white);border-radius:16px;padding:32px 24px;border:1.5px solid rgba(0,0,0,0.08);display:flex;flex-direction:column;position:relative}
+.tier.featured{border-color:var(--pri);box-shadow:0 12px 32px rgba(153,60,29,0.12)}
+.tier-badge{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--pri);color:#fff;padding:5px 16px;border-radius:20px;font-size:12px;font-weight:500;letter-spacing:.5px;white-space:nowrap}
+.tier-name{font-size:13px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.tier-price{font-family:'Bebas Neue',sans-serif;font-size:52px;color:var(--pri);letter-spacing:1px;line-height:1;margin:10px 0 2px}
+.tier-price small{font-size:15px;color:var(--muted);font-family:'DM Sans',sans-serif;letter-spacing:0}
+.tier-sub{font-size:13px;color:var(--muted);margin-bottom:20px;min-height:17px}
+.tier ul{list-style:none;text-align:left;margin:0 0 24px;flex:1}
+.tier li{padding:8px 0;font-size:14px;display:flex;align-items:flex-start;gap:8px;border-bottom:1px solid rgba(0,0,0,0.04)}
+.tier li i{color:#1D9E75;font-size:16px;flex:none;margin-top:2px}
+.btn-outline2{display:inline-flex;align-items:center;justify-content:center;gap:7px;width:100%;padding:12px;border-radius:8px;border:1.5px solid var(--pri);color:var(--pri);background:transparent;font-size:15px;font-weight:500;text-decoration:none;transition:all .2s;cursor:pointer}
+.btn-outline2:hover{background:var(--pri);color:#fff}
 
 /* CTA */
 .cta{padding:80px 0;background:var(--pri);text-align:center}
@@ -119,6 +132,7 @@ a{text-decoration:none;color:inherit}
   .comp-table{font-size:13px}
   .comp-table th,.comp-table td{padding:10px 8px}
   .price-card{padding:32px 24px}
+  .price-grid{grid-template-columns:1fr;max-width:420px}
   .footer-inner{flex-direction:column;text-align:center}
 }
 @media(max-width:480px){
@@ -154,7 +168,7 @@ a{text-decoration:none;color:inherit}
       <a href="#how" class="btn-secondary"><i class="ti ti-player-play" aria-hidden="true"></i> See how it works</a>
     </div>
     <div class="hero-stats">
-      <div class="hero-stat"><div class="hero-stat-val">$0</div><div class="hero-stat-label">Monthly cost</div></div>
+      <div class="hero-stat"><div class="hero-stat-val">RM0</div><div class="hero-stat-label">To start</div></div>
       <div class="hero-stat"><div class="hero-stat-val">3 min</div><div class="hero-stat-label">Setup time</div></div>
       <div class="hero-stat"><div class="hero-stat-val">3</div><div class="hero-stat-label">Languages</div></div>
       <div class="hero-stat"><div class="hero-stat-val">0</div><div class="hero-stat-label">App downloads needed</div></div>
@@ -250,7 +264,7 @@ a{text-decoration:none;color:inherit}
         <tr><th>Feature</th><th>Choppkar</th><th>Stamp Me</th><th>Pixalink</th><th>Perkstar</th></tr>
       </thead>
       <tbody>
-        <tr><td>Monthly price</td><td class="check">Free</td><td>$43</td><td>RM320+</td><td>$19</td></tr>
+        <tr><td>Monthly price</td><td class="check">From RM0</td><td>$43</td><td>RM320+</td><td>$19</td></tr>
         <tr><td>App download needed</td><td class="check">No (PWA)</td><td>Yes</td><td>No</td><td>No</td></tr>
         <tr><td>Stamp cards</td><td class="check"><i class="ti ti-check" aria-hidden="true"></i></td><td class="check"><i class="ti ti-check" aria-hidden="true"></i></td><td class="check"><i class="ti ti-check" aria-hidden="true"></i></td><td class="check"><i class="ti ti-check" aria-hidden="true"></i></td></tr>
         <tr><td>Bottle keep</td><td class="check"><i class="ti ti-check" aria-hidden="true"></i></td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
@@ -290,23 +304,53 @@ a{text-decoration:none;color:inherit}
 <section class="pricing" id="pricing">
   <div class="container">
     <h2 class="sec-title">Simple pricing</h2>
-    <p class="sec-sub">One plan. All features. Zero cost.</p>
-    <div class="price-card">
-      <div class="price-badge">Forever free</div>
-      <div class="price-val">$0</div>
-      <div class="price-label">per month, no credit card needed</div>
-      <ul class="price-list">
-        <li><i class="ti ti-check" aria-hidden="true"></i> Unlimited members</li>
-        <li><i class="ti ti-check" aria-hidden="true"></i> Unlimited stamps &amp; redemptions</li>
-        <li><i class="ti ti-check" aria-hidden="true"></i> Bottle keep &amp; vouchers</li>
-        <li><i class="ti ti-check" aria-hidden="true"></i> Push notification campaigns</li>
-        <li><i class="ti ti-check" aria-hidden="true"></i> Analytics dashboard</li>
-        <li><i class="ti ti-check" aria-hidden="true"></i> Multi-branch support</li>
-        <li><i class="ti ti-check" aria-hidden="true"></i> 3 languages (中文 / EN / BM)</li>
-        <li><i class="ti ti-check" aria-hidden="true"></i> Custom branding &amp; logo</li>
-        <li><i class="ti ti-check" aria-hidden="true"></i> Security monitoring</li>
-      </ul>
-      <a href="/dashboard" class="btn-primary" style="width:100%;justify-content:center"><i class="ti ti-rocket" aria-hidden="true"></i> Get started free</a>
+    <p class="sec-sub">Start free. Upgrade only when you grow. Cancel anytime.</p>
+    <div class="price-grid">
+      <!-- Free -->
+      <div class="tier">
+        <div class="tier-name">Free</div>
+        <div class="tier-price">RM0<small>/mo</small></div>
+        <div class="tier-sub">No credit card needed</div>
+        <ul>
+          <li><i class="ti ti-check" aria-hidden="true"></i> Digital stamp cards</li>
+          <li><i class="ti ti-check" aria-hidden="true"></i> Member sign-up (50 SMS/mo)</li>
+          <li><i class="ti ti-check" aria-hidden="true"></i> Manual push campaigns</li>
+          <li><i class="ti ti-check" aria-hidden="true"></i> Referral program</li>
+          <li><i class="ti ti-check" aria-hidden="true"></i> 1 branch</li>
+          <li><i class="ti ti-check" aria-hidden="true"></i> Basic analytics</li>
+        </ul>
+        <a href="/dashboard" class="btn-outline2"><i class="ti ti-rocket" aria-hidden="true"></i> Start free</a>
+      </div>
+      <!-- Pro -->
+      <div class="tier featured">
+        <div class="tier-badge">Most popular</div>
+        <div class="tier-name">Pro</div>
+        <div class="tier-price">RM49<small>/mo</small></div>
+        <div class="tier-sub">For growing single shops</div>
+        <ul>
+          <li><i class="ti ti-check" aria-hidden="true"></i> <b>Everything in Free, plus:</b></li>
+          <li><i class="ti ti-check" aria-hidden="true"></i> Member tiers (auto-upgrade by spend)</li>
+          <li><i class="ti ti-check" aria-hidden="true"></i> Auto birthday / anniversary</li>
+          <li><i class="ti ti-check" aria-hidden="true"></i> Unlimited SMS</li>
+          <li><i class="ti ti-check" aria-hidden="true"></i> Advanced analytics + CSV export</li>
+          <li><i class="ti ti-check" aria-hidden="true"></i> Up to 3 branches</li>
+        </ul>
+        <a href="/dashboard" class="btn-primary" style="width:100%;justify-content:center"><i class="ti ti-crown" aria-hidden="true"></i> Choose Pro</a>
+      </div>
+      <!-- Business -->
+      <div class="tier">
+        <div class="tier-name">Business</div>
+        <div class="tier-price">RM99<small>/mo</small></div>
+        <div class="tier-sub">For chains &amp; multi-outlet</div>
+        <ul>
+          <li><i class="ti ti-check" aria-hidden="true"></i> <b>Everything in Pro, plus:</b></li>
+          <li><i class="ti ti-check" aria-hidden="true"></i> Unlimited branches</li>
+          <li><i class="ti ti-check" aria-hidden="true"></i> White-label (remove Choppkar)</li>
+          <li><i class="ti ti-check" aria-hidden="true"></i> Multiple staff accounts</li>
+          <li><i class="ti ti-check" aria-hidden="true"></i> Priority support</li>
+        </ul>
+        <a href="/dashboard" class="btn-outline2"><i class="ti ti-building-store" aria-hidden="true"></i> Choose Business</a>
+      </div>
     </div>
   </div>
 </section>

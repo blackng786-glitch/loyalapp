@@ -1048,6 +1048,7 @@ app.get('/api/billing/:merchantId', async (req, res) => {
     expiresAt: merchant?.plan_expires_at || null,
     hasSubscription: !!merchant?.stripe_subscription_id,
     sms: { used: quota.used, limit: quota.isPro ? 'unlimited' : quota.limit },
+    billingEnabled: !!(stripe && STRIPE_PRICE_ID),   // false until Stripe keys are set
   });
 });
 
