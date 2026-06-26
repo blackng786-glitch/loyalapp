@@ -160,6 +160,37 @@ canvas#scan-canvas{display:none}
 .chip:hover{border-color:var(--brand);color:var(--brand)}
 .toast.ok{border-color:#1D9E75;color:#1D9E75}
 .toast.err{border-color:#E24B4A;color:#E24B4A}
+.tier-badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500;letter-spacing:.5px}
+.tier-bronze{background:rgba(205,127,50,.15);color:#CD7F32;border:1px solid rgba(205,127,50,.3)}
+.tier-silver{background:rgba(192,192,192,.15);color:#C0C0C0;border:1px solid rgba(192,192,192,.3)}
+.tier-gold{background:rgba(255,215,0,.15);color:#FFD700;border:1px solid rgba(255,215,0,.3)}
+.tier-platinum{background:rgba(229,228,226,.15);color:#E5E4E2;border:1px solid rgba(229,228,226,.3)}
+.detail-modal{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;display:none;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.detail-modal.on{display:flex;flex-direction:column;align-items:center}
+.detail-inner{width:100%;max-width:430px;background:var(--bg);min-height:100vh;min-height:100dvh;padding:0 0 40px}
+.detail-nav{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--b1);background:var(--ck-primary);position:sticky;top:0;z-index:51}
+.detail-nav-title{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:var(--ck-light)}
+.detail-hdr{text-align:center;padding:20px 16px 14px}
+.detail-avatar{width:56px;height:56px;border-radius:50%;background:rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.12);border:2px solid rgba(var(--brand-r),var(--brand-g),var(--brand-b),0.3);display:inline-flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--brand);margin-bottom:8px}
+.detail-name{font-size:17px;font-weight:500}
+.detail-phone{font-size:12px;color:var(--t2);font-family:'DM Mono',monospace;margin-top:2px}
+.detail-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:0 16px 12px}
+.detail-stat{background:var(--s1);border:1px solid var(--b2);border-radius:10px;padding:10px;text-align:center}
+.detail-stat-val{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--brand);line-height:1}
+.detail-stat-lbl{font-size:10px;color:var(--t3);margin-top:2px;letter-spacing:1px;text-transform:uppercase}
+.detail-section{padding:0 16px;margin-bottom:14px}
+.detail-section-title{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.detail-section-title i{color:var(--brand);font-size:14px}
+.detail-actions{display:flex;gap:8px;padding:0 16px;margin-bottom:14px}
+.detail-actions .btn{flex:1}
+.h-list{background:var(--s1);border:1px solid var(--b2);border-radius:10px;overflow:hidden}
+.h-row{display:flex;align-items:center;gap:10px;padding:10px 13px;border-bottom:1px solid var(--b1)}
+.h-row:last-child{border-bottom:none}
+.h-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.h-dot.s{background:var(--brand)}.h-dot.r{background:#E24B4A}
+.h-body{flex:1;min-width:0}
+.h-title{font-size:13px}.h-sub{font-size:11px;color:var(--t3)}
+.h-time{font-size:11px;color:var(--t3);font-family:'DM Mono',monospace}
 </style>
 </head>
 <body>
@@ -201,7 +232,7 @@ canvas#scan-canvas{display:none}
   <div class="tabs" id="staff-tabs">
     <button class="tab on" onclick="sTab(0,'search')">Members</button>
     <button class="tab" onclick="sTab(1,'dashboard')">Dashboard</button>
-    <button class="tab" id="tab-bottle" style="display:none" onclick="sTab(2,'bottle')">存酒</button>
+    <button class="tab" id="tab-bottle" style="display:none" onclick="sTab(2,'bottle')">存储管理</button>
   </div>
 
   <div class="pane on" id="tp-search">
@@ -280,6 +311,29 @@ canvas#scan-canvas{display:none}
     </div>
   </div>
 </div>
+<div class="overlay" id="redeem-modal">
+  <div class="modal">
+    <div class="modal-title">Redeem Reward</div>
+    <div class="modal-sub">Member: <strong id="rdm-modal-name"></strong></div>
+    <div id="rdm-modal-info" style="font-size:12px;color:var(--t2);margin-bottom:12px"></div>
+    <select class="modal-select" id="rdm-modal-reward"></select>
+    <div class="modal-btns">
+      <button class="btn btn-outline" onclick="closeRedeem()">Cancel</button>
+      <button class="btn btn-brand" onclick="doRedeem()"><i class="ti ti-gift" aria-hidden="true"></i> Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div class="detail-modal" id="member-detail">
+  <div class="detail-inner">
+    <div class="detail-nav">
+      <div class="detail-nav-title">MEMBER DETAIL</div>
+      <button class="nav-btn" onclick="closeDetail()"><i class="ti ti-x" aria-hidden="true"></i> Close</button>
+    </div>
+    <div id="detail-content"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -353,7 +407,7 @@ async function checkPin(){
   loadStaffBranches();
   loadAllMembers();
   loadDashboard();
-  if(S.merchant.feature_bottle){$('tab-bottle').style.display='';bSearch('');}
+  if(S.merchant.feature_bottle||S.merchant.feature_voucher){$('tab-bottle').style.display='';bSearch('');}
   toast('Welcome, '+S.staff.name+'!');
 }
 
@@ -391,6 +445,7 @@ function onSearch(q){
   renderMemberList(S.filteredMembers);
 }
 
+function tierClass(t){return 'tier-'+(t||'bronze').toLowerCase();}
 function renderMemberList(members){
   const res=$('s-results');
   const count=$('member-count');
@@ -404,10 +459,12 @@ function renderMemberList(members){
   res.innerHTML='';
   members.forEach(m=>{
     const cur=m.stampCount%perCard,pts=m.stampCount*10;
+    const tier=m.tier||'Bronze';
     const init=m.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
     const minis=Array.from({length:perCard},(_,i)=>'<div class="sm '+(i<cur?'on':'off')+'"><i class="ti '+(i<cur?'ti-check':'ti-droplet')+'" aria-hidden="true"></i></div>').join('');
+    const free=Math.floor(m.stampCount/perCard)-(m.redeemCount||0);
     const card=mk('div');card.className='mr fade';
-    card.innerHTML='<div class="mr-top"><div class="avatar">'+esc(init)+'</div><div class="mr-info"><div class="mr-name">'+esc(m.name)+'</div><div class="mr-meta">'+esc(m.phone)+' - '+m.stampCount+' stamps</div></div><div class="mr-pts"><div class="mr-pts-val">'+pts+'</div><div class="mr-pts-lbl">pts</div></div></div><div class="sm-row">'+minis+'</div><div class="act-row"><button class="btn btn-brand" onclick="openStamp(\''+m.id+'\',\''+esc(m.name)+'\')"><i class="ti ti-star" aria-hidden="true"></i> Add Stamp</button><button class="btn btn-outline" onclick="toast(\'Redemption coming soon\')"><i class="ti ti-gift" aria-hidden="true"></i> Redeem</button></div>';
+    card.innerHTML='<div class="mr-top" style="cursor:pointer" onclick="openDetail(\''+m.id+'\')"><div class="avatar">'+esc(init)+'</div><div class="mr-info"><div class="mr-name">'+esc(m.name)+' <span class="tier-badge '+tierClass(tier)+'">'+esc(tier)+'</span></div><div class="mr-meta">'+esc(m.phone)+' · '+m.stampCount+' stamps</div></div><div class="mr-pts"><div class="mr-pts-val">'+pts+'</div><div class="mr-pts-lbl">pts</div></div></div><div class="sm-row">'+minis+'</div><div class="act-row"><button class="btn btn-brand" onclick="event.stopPropagation();openStamp(\''+m.id+'\',\''+esc(m.name)+'\')"><i class="ti ti-star" aria-hidden="true"></i> Stamp</button><button class="btn btn-outline" onclick="event.stopPropagation();openRedeemModal(\''+m.id+'\',\''+esc(m.name)+'\','+m.stampCount+','+(m.redeemCount||0)+')"'+(free>0?'':' disabled')+'><i class="ti ti-gift" aria-hidden="true"></i> Redeem'+(free>0?' ('+free+')':'')+'</button></div>';
     res.appendChild(card);
   });
 }
@@ -494,6 +551,96 @@ async function doStamp(){
 }
 
 $('stamp-modal').addEventListener('click',function(e){if(e.target===this)closeModal();});
+$('redeem-modal').addEventListener('click',function(e){if(e.target===this)closeRedeem();});
+
+// ── REDEEM ──────────────────────────────────────────────────
+let redeemMemberId='',redeemMemberName='';
+function openRedeemModal(id,name,stamps,redeemed){
+  redeemMemberId=id;redeemMemberName=name;
+  $('rdm-modal-name').textContent=name;
+  const perCard=S.merchant.stamps_per_card||10;
+  const free=Math.floor(stamps/perCard)-redeemed;
+  $('rdm-modal-info').textContent=free+' reward'+(free!==1?'s':'')+' available ('+stamps+' stamps, '+redeemed+' redeemed)';
+  const sel=$('rdm-modal-reward');
+  sel.innerHTML='<option>'+esc(S.merchant.reward_name||'Free Item')+'</option>';
+  $('redeem-modal').classList.add('on');
+}
+function closeRedeem(){$('redeem-modal').classList.remove('on');}
+async function doRedeem(){
+  const reward=$('rdm-modal-reward').value;
+  closeRedeem();
+  const res=await fetch(API+'/api/staff/redeem',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({memberId:redeemMemberId,merchantId:S.merchant.id,rewardName:reward})});
+  if(res.ok){toast('Redeemed for '+redeemMemberName,'ok');loadAllMembers();}
+  else{const d=await res.json().catch(()=>({}));toast(d.error||'Redeem failed','err');}
+}
+
+// ── MEMBER DETAIL ───────────────────────────────────────────
+function closeDetail(){$('member-detail').classList.remove('on');}
+async function openDetail(id){
+  $('member-detail').classList.add('on');
+  $('detail-content').innerHTML='<div class="loader" style="padding:60px"><i class="ti ti-loader-2" aria-hidden="true"></i></div>';
+  const res=await fetch(API+'/api/staff/member/'+id+'?merchantId='+S.merchant.id);
+  if(!res.ok){toast('Failed to load member','err');closeDetail();return;}
+  const d=await res.json();
+  const m=d.member,stamps=d.stamps||[],redemptions=d.redemptions||[],bottles=d.bottles||[],vouchers=d.vouchers||[];
+  const totalStamps=d.totalStamps||stamps.length;
+  const perCard=S.merchant.stamps_per_card||10;
+  const free=Math.floor(totalStamps/perCard)-redemptions.length;
+  const pts=totalStamps*10;
+  let tier='Bronze';
+  if(m.tier)tier=m.tier;
+  else{if(totalStamps>=200)tier='Platinum';else if(totalStamps>=100)tier='Gold';else if(totalStamps>=50)tier='Silver';}
+  const init=m.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+
+  let h='<div class="detail-hdr">'
+    +'<div class="detail-avatar">'+esc(init)+'</div>'
+    +'<div class="detail-name">'+esc(m.name)+' <span class="tier-badge '+tierClass(tier)+'">'+esc(tier)+'</span></div>'
+    +'<div class="detail-phone">'+esc(m.phone)+'</div>'
+    +'</div>';
+
+  h+='<div class="detail-stats">'
+    +'<div class="detail-stat"><div class="detail-stat-val">'+totalStamps+'</div><div class="detail-stat-lbl">Stamps</div></div>'
+    +'<div class="detail-stat"><div class="detail-stat-val">'+pts+'</div><div class="detail-stat-lbl">Points</div></div>'
+    +'<div class="detail-stat"><div class="detail-stat-val">'+Math.max(0,free)+'</div><div class="detail-stat-lbl">Free</div></div>'
+    +'</div>';
+
+  if(m.total_spent)h+='<div style="text-align:center;font-size:12px;color:var(--t2);margin-bottom:12px">Total spent: <b style="color:var(--brand)">RM'+Number(m.total_spent).toFixed(2)+'</b></div>';
+
+  h+='<div class="detail-actions">'
+    +'<button class="btn btn-brand" onclick="closeDetail();openStamp(\''+m.id+'\',\''+esc(m.name)+'\')"><i class="ti ti-star" aria-hidden="true"></i> Stamp</button>'
+    +'<button class="btn btn-outline" onclick="closeDetail();openRedeemModal(\''+m.id+'\',\''+esc(m.name)+'\','+totalStamps+','+redemptions.length+')"'+(free>0?'':' disabled')+'><i class="ti ti-gift" aria-hidden="true"></i> Redeem'+(free>0?' ('+free+')':'')+'</button>'
+    +'</div>';
+
+  if(bottles.length){
+    h+='<div class="detail-section"><div class="detail-section-title"><i class="ti ti-bottle" aria-hidden="true"></i> Bottles ('+bottles.length+')</div><div class="h-list">';
+    bottles.forEach(b=>{
+      const pct=Math.max(0,Math.min(100,Math.round(b.remaining_ml/b.size_ml*100)));
+      h+='<div class="h-row"><div class="h-dot s"></div><div class="h-body"><div class="h-title">'+esc(b.brand)+'</div><div class="h-sub">'+b.remaining_ml+'/'+b.size_ml+'ml ('+pct+'%)</div></div></div>';
+    });
+    h+='</div></div>';
+  }
+
+  if(vouchers.length){
+    h+='<div class="detail-section"><div class="detail-section-title"><i class="ti ti-ticket" aria-hidden="true"></i> Vouchers ('+vouchers.length+')</div><div class="h-list">';
+    vouchers.forEach(v=>{
+      const unit=v.type==='session'?'次':'';
+      h+='<div class="h-row"><div class="h-dot s"></div><div class="h-body"><div class="h-title">'+esc(v.label||(v.type==='session'?'次卡':'储值卡'))+'</div><div class="h-sub">剩余 '+(+v.remaining)+unit+' / 总 '+(+v.total)+unit+'</div></div></div>';
+    });
+    h+='</div></div>';
+  }
+
+  const history=[...stamps.map(s=>({type:'s',title:s.service,sub:s.branch||'',date:s.created_at,val:s.amount?'RM'+s.amount:''})),...redemptions.map(r=>({type:'r',title:r.reward_name,sub:'Redeemed',date:r.created_at,val:''}))].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,15);
+
+  if(history.length){
+    h+='<div class="detail-section"><div class="detail-section-title"><i class="ti ti-history" aria-hidden="true"></i> Recent Activity</div><div class="h-list">';
+    history.forEach(e=>{
+      h+='<div class="h-row"><div class="h-dot '+e.type+'"></div><div class="h-body"><div class="h-title">'+esc(e.title)+'</div><div class="h-sub">'+esc(e.sub)+(e.val?' · '+e.val:'')+'</div></div><div class="h-time">'+fmtTime(e.date)+'</div></div>';
+    });
+    h+='</div></div>';
+  }
+
+  $('detail-content').innerHTML=h;
+}
 
 async function loadDashboard(){
   const data=await fetch(API+'/api/dashboard/'+S.merchant.id).then(r=>r.json());
@@ -516,7 +663,7 @@ let _tt;function toast(msg,type){const el=$('toast');el.textContent=msg;el.class
 function initials(n){return String(n||'').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();}
 function bSearch(q){
   const res=$('b-results');S.bMember=null;
-  if(!q||!q.trim()){res.innerHTML='<div class="empty"><i class="ti ti-bottle" aria-hidden="true"></i><p>搜索会员开始登记存酒 / 扣量</p></div>';return;}
+  if(!q||!q.trim()){res.innerHTML='<div class="empty"><i class="ti ti-package" aria-hidden="true"></i><p>搜索会员管理存酒 / 券</p></div>';return;}
   const lq=q.toLowerCase();
   const list=(S.allMembers||[]).filter(m=>m.name.toLowerCase().includes(lq)||m.phone.includes(q)).slice(0,8);
   if(!list.length){res.innerHTML='<div class="empty"><i class="ti ti-user-off" aria-hidden="true"></i><p>无匹配会员</p></div>';return;}
@@ -533,14 +680,16 @@ async function renderBottleMember(){
     S.merchant.feature_voucher?fetch(API+'/api/vouchers?'+q).then(r=>r.json()).catch(()=>[]):Promise.resolve([])
   ]);
   let h='<div class="mr"><div class="mr-top"><div class="avatar">'+esc(initials(m.name))+'</div><div class="mr-info"><div class="mr-name">'+esc(m.name)+'</div><div class="mr-meta">'+esc(m.phone)+'</div></div><button class="chip" onclick="bClear()">× 换人</button></div></div>';
-  h+='<div class="box"><div class="box-ttl">登记新存酒</div>'
-    +'<input class="search-input" id="dep-brand" placeholder="品牌 如 Hennessy XO" style="margin-bottom:8px">'
-    +'<input class="search-input" id="dep-size" type="number" inputmode="numeric" placeholder="容量 ml" style="margin-bottom:6px">'
-    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+[375,700,750,1000,1750].map(s=>'<button class="chip" onclick="document.getElementById(\'dep-size\').value='+s+'">'+s+'</button>').join('')+'</div>'
-    +'<input class="search-input" id="dep-exp" type="date" style="margin-bottom:10px">'
-    +'<button class="btn btn-brand" onclick="bDeposit()"><i class="ti ti-plus" aria-hidden="true"></i> 登记存酒</button></div>';
-  h+='<div class="box-ttl">该会员存酒</div>';
-  h+=bottles.length?bottles.map(bottleCard).join(''):'<div class="empty" style="padding:18px"><p>暂无存酒</p></div>';
+  if(S.merchant.feature_bottle){
+    h+='<div class="box"><div class="box-ttl">登记新存酒</div>'
+      +'<input class="search-input" id="dep-brand" placeholder="品牌 如 Hennessy XO" style="margin-bottom:8px">'
+      +'<input class="search-input" id="dep-size" type="number" inputmode="numeric" placeholder="容量 ml" style="margin-bottom:6px">'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+[375,700,750,1000,1750].map(s=>'<button class="chip" onclick="document.getElementById(\'dep-size\').value='+s+'">'+s+'</button>').join('')+'</div>'
+      +'<input class="search-input" id="dep-exp" type="date" style="margin-bottom:10px">'
+      +'<button class="btn btn-brand" onclick="bDeposit()"><i class="ti ti-plus" aria-hidden="true"></i> 登记存酒</button></div>';
+    h+='<div class="box-ttl">该会员存酒</div>';
+    h+=bottles.length?bottles.map(bottleCard).join(''):'<div class="empty" style="padding:18px"><p>暂无存酒</p></div>';
+  }
   if(S.merchant.feature_voucher){
     h+='<div class="box"><div class="box-ttl">发储值券</div>'
       +'<select class="search-input" id="vc-type" style="margin-bottom:8px"><option value="session">次卡(按次)</option><option value="credit">储值(按金额)</option></select>'

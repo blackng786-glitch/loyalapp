@@ -705,6 +705,52 @@ app.post('/api/redeem', async (req, res) => {
   res.json(data);
 });
 
+app.post('/api/staff/redeem', async (req, res) => {
+  const { memberId, merchantId, rewardName } = req.body;
+  const auth = await requireStaffOrMerchant(req, res, merchantId);
+  if (!auth) return;
+  const [merchantR, stampsR, redeemedR] = await Promise.all([
+    db.from('merchants').select('stamps_per_card').eq('id', merchantId).maybeSingle(),
+    db.from('stamps').select('*', { count: 'exact', head: true }).eq('member_id', memberId).eq('merchant_id', merchantId),
+    db.from('redemptions').select('*', { count: 'exact', head: true }).eq('member_id', memberId).eq('merchant_id', merchantId),
+  ]);
+  const goal = merchantR.data?.stamps_per_card || 10;
+  const totalStamps = stampsR.count || 0;
+  const totalRedeemed = redeemedR.count || 0;
+  const available = totalStamps - (totalRedeemed * goal);
+  if (available < goal) return res.status(400).json({ error: '印章不足，无法兑换' });
+  const { data, error } = await db.from('redemptions')
+    .insert({ member_id: memberId, merchant_id: merchantId, reward_name: rewardName })
+    .select().single();
+  if (error) return res.status(400).json({ error: safeDbError(error) });
+  res.json(data);
+});
+
+app.get('/api/staff/member/:id', async (req, res) => {
+  const { merchantId } = req.query;
+  const auth = await requireStaffOrMerchant(req, res, merchantId);
+  if (!auth) return;
+  const mid = req.params.id;
+  const [memberR, stampsR, redemptionsR, bottlesR, vouchersR] = await Promise.all([
+    db.from('members').select('*').eq('id', mid).eq('merchant_id', merchantId).maybeSingle(),
+    db.from('stamps').select('service,branch,created_at,amount').eq('member_id', mid).eq('merchant_id', merchantId).order('created_at', { ascending: false }).limit(20),
+    db.from('redemptions').select('reward_name,created_at').eq('member_id', mid).eq('merchant_id', merchantId).order('created_at', { ascending: false }).limit(20),
+    db.from('bottles').select('id,brand,size_ml,remaining_ml,expires_at').eq('member_id', mid).eq('merchant_id', merchantId),
+    db.from('vouchers').select('id,type,label,total,remaining,expires_at').eq('member_id', mid).eq('merchant_id', merchantId),
+  ]);
+  if (!memberR.data) return res.status(404).json({ error: 'Member not found' });
+  const stamps = stampsR.data || [];
+  const totalStamps = stamps.length < 20 ? stamps.length : ((await db.from('stamps').select('*', { count: 'exact', head: true }).eq('member_id', mid).eq('merchant_id', merchantId)).count || 0);
+  res.json({
+    member: memberR.data,
+    stamps,
+    redemptions: redemptionsR.data || [],
+    bottles: bottlesR.data || [],
+    vouchers: vouchersR.data || [],
+    totalStamps,
+  });
+});
+
 // ── DASHBOARD STATS ───────────────────────────────────────────
 app.get('/api/dashboard/:merchantId', async (req, res) => {
   const mid = req.params.merchantId;
