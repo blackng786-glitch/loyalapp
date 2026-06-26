@@ -333,6 +333,7 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
   <div class="tabs" id="mem-tabs">
     <button class="tab on" data-pane="stamps" onclick="mTab('stamps')">Stamps</button>
     <button class="tab" data-pane="bottles" onclick="mTab('bottles')" id="tab-bottles" style="display:none"><i class="ti ti-bottle" style="font-size:13px;vertical-align:-1px" aria-hidden="true"></i> Bottles</button>
+    <button class="tab" data-pane="vouchers" onclick="mTab('vouchers')" id="tab-vouchers" style="display:none"><i class="ti ti-ticket" style="font-size:13px;vertical-align:-1px" aria-hidden="true"></i> Vouchers</button>
     <button class="tab" data-pane="rewards" onclick="mTab('rewards')">Rewards</button>
     <button class="tab" data-pane="history" onclick="mTab('history')">History</button>
     <button class="tab" data-pane="referral" onclick="mTab('referral')" id="tab-referral" style="display:none"><i class="ti ti-gift" style="font-size:13px;vertical-align:-1px" aria-hidden="true"></i> Refer</button>
@@ -357,10 +358,9 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
   </div>
   <div class="pane" id="tp-bottles">
     <div id="bottles-wrap"></div>
-    <div id="vouchers-section" style="display:none">
-      <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin:8px 2px 12px;display:flex;align-items:center;gap:8px"><i class="ti ti-ticket" style="color:var(--brand)" aria-hidden="true"></i> 我的券</div>
-      <div id="vouchers-wrap"></div>
-    </div>
+  </div>
+  <div class="pane" id="tp-vouchers">
+    <div id="vouchers-wrap"></div>
   </div>
   <div class="pane" id="tp-rewards"><div id="rewards-wrap"></div></div>
   <div class="pane" id="tp-history"><div id="history-wrap"><div class="loader"><i class="ti ti-loader-2" aria-hidden="true"></i></div></div></div>
@@ -454,7 +454,7 @@ function getPhone(ccId,phId){
 }
 
 // ── SESSION (30-day expiry, 含服务端签发的登录 token) ─────────
-const SESSION_DAYS=30;
+const SESSION_DAYS=90;
 function saveSession(member,token){
   const session={memberId:member.id,phone:member.phone,name:member.name,token:token||S.token,expiresAt:Date.now()+SESSION_DAYS*86400000};
   try{
@@ -695,6 +695,9 @@ function renderMemberView(){
   const btTab=$('tab-bottles');
   if(btTab){btTab.style.display=m.feature_bottle?'':'none';}
   if(m.feature_bottle)loadBottleData();
+  const vcTab=$('tab-vouchers');
+  if(vcTab){vcTab.style.display=m.feature_voucher?'':'none';}
+  if(m.feature_voucher)loadVoucherData();
   const rfTab=$('tab-referral');
   if(rfTab){rfTab.style.display=m.feature_referral?'':'none';}
   if(m.feature_referral){
@@ -776,11 +779,6 @@ async function loadBottleData(){
     if(br.status===401)return;
     const bottles=await br.json().catch(()=>[]);
     renderBottles(Array.isArray(bottles)?bottles:[]);
-    if(S.merchant.feature_voucher){
-      const vouchers=await fetch(API+'/api/vouchers?'+q).then(r=>r.json()).catch(()=>[]);
-      $('vouchers-section').style.display='block';
-      renderVouchers(vouchers||[]);
-    }
   }catch(e){toast(t('加载存酒失败'));}
 }
 
@@ -833,6 +831,18 @@ function renderVouchers(list){
       +'<div class="v-body"><div class="v-label">'+esc(v.label||(v.type==='session'?t('次卡(按次)'):t('储值(按金额)')))+'</div>'+exp+'</div>'
       +'<div class="v-rem"><div class="v-rem-val">'+(+v.remaining)+'</div><div class="v-rem-lbl">'+t('剩余')+unit+'</div></div></div>';
   }).join('');
+}
+
+async function loadVoucherData(){
+  const wrap=$('vouchers-wrap');
+  wrap.innerHTML='<div class="loader"><i class="ti ti-loader-2" aria-hidden="true"></i></div>';
+  const q='memberId='+encodeURIComponent(S.member.id)+'&merchantId='+encodeURIComponent(S.merchant.id);
+  try{
+    const res=await fetch(API+'/api/vouchers?'+q);
+    if(res.status===401)return;
+    const vouchers=await res.json().catch(()=>[]);
+    renderVouchers(Array.isArray(vouchers)?vouchers:[]);
+  }catch(e){toast(t('加载券失败'));}
 }
 
 // ── REFERRAL ────────────────────────────────────────────────

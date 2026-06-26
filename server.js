@@ -97,7 +97,7 @@ function verifyToken(token) {
     return Date.now() > data.exp ? null : data;
   } catch (e) { return null; }
 }
-const memberToken = (memberId, merchantId) => signToken({ t: 'member', memberId, merchantId }, 30 * 86400000); // 30 天
+const memberToken = (memberId, merchantId) => signToken({ t: 'member', memberId, merchantId }, 90 * 86400000); // 90 天
 const regTicketFor = (phone, merchantId) => signToken({ t: 'reg', phone, merchantId }, 15 * 60000);            // 15 分钟
 
 // 从请求头取已验证的会员身份 (x-member-token)
