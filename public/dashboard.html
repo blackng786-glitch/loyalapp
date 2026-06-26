@@ -810,8 +810,12 @@ async function resetPassword(){
 async function loadMerchant(){
   if(!S.user)return;
   const res=await fetch(API+'/api/merchant/by-auth/'+S.user.id);
+  if(!res.ok){
+    if(res.status===401){try{await db.auth.signOut();}catch(e){}show('auth');toast('Session expired — please sign in again');return;}
+    show('auth');toast('Failed to load merchant data');return;
+  }
   const data=await res.json();
-  if(!data){S.merchant=null;$('slug-prefix').textContent=location.origin+'/card?m=';show('setup');return;}
+  if(!data||!data.id){S.merchant=null;$('slug-prefix').textContent=location.origin+'/card?m=';show('setup');return;}
   S.merchant=data;
   showDashboard();
   const params=new URLSearchParams(location.search);
@@ -862,6 +866,7 @@ async function doSetup(){
 }
 
 async function showDashboard(){
+  if(!S.merchant||!S.merchant.id){show('auth');return;}
   const m=S.merchant,base=location.origin;
   $('nav-biz').textContent=m.name;
   $('link-card').textContent=base+'/card?m='+m.slug;
@@ -1010,6 +1015,7 @@ async function loadScheduled(){
 }
 
 function renderScheduled(list){
+  if(!Array.isArray(list))list=[];
   $('sched-count').textContent=list.filter(s=>s.status==='pending').length;
   const box=$('sched-list');
   if(!list.length){box.innerHTML='<div class="empty-sm">No scheduled notifications</div>';return;}
@@ -1027,8 +1033,9 @@ async function cancelScheduled(id){
 
 // ── BRANCHES ──────────────────────────────
 async function loadBranches(){
+  if(!S.merchant||!S.merchant.id)return;
   const list=await fetch(API+'/api/branches/'+S.merchant.id).then(r=>r.json()).catch(()=>[]);
-  S.branches=list||[];renderBranches();
+  S.branches=Array.isArray(list)?list:[];renderBranches();
   const sel=$('an-branch'),cur=sel.value;
   sel.innerHTML='<option value="all">All branches</option>'+S.branches.map(b=>'<option value="'+esc(b.name)+'">'+esc(b.name)+'</option>').join('');
   sel.value=cur||'all';
@@ -1076,12 +1083,13 @@ function barCfg(labels,data,color){return{type:'bar',data:{labels,datasets:[{dat
 function dougCfg(labels,data){var lp=window.innerWidth<640?'bottom':'right';return{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:PIE,borderColor:'#141414',borderWidth:2}]},options:{plugins:{legend:{position:lp,labels:{boxWidth:10,padding:8}}},cutout:'62%',maintainAspectRatio:false}};}
 function draw(key,canvasId,cfg){if(charts[key])charts[key].destroy();charts[key]=new Chart($(canvasId),cfg);}
 function renderCharts(d){
+  if(!d||!d.dailyStamps)return;
   draw('stamps','chart-stamps',lineCfg(d.dailyStamps.map(x=>fmtDay(x.date)),d.dailyStamps.map(x=>x.count),GOLD));
-  draw('members','chart-members',barCfg(d.dailyMembers.map(x=>fmtDay(x.date)),d.dailyMembers.map(x=>x.count),GREEN));
-  const svc=d.serviceBreakdown.slice(0,7);
+  draw('members','chart-members',barCfg((d.dailyMembers||[]).map(x=>fmtDay(x.date)),(d.dailyMembers||[]).map(x=>x.count),GREEN));
+  const svc=(d.serviceBreakdown||[]).slice(0,7);
   draw('services','chart-services',svc.length?dougCfg(svc.map(x=>x.label),svc.map(x=>x.count)):dougCfg(['No data'],[1]));
   const tl=['Bronze','Silver','Gold','Platinum'];
-  draw('tiers','chart-tiers',dougCfg(tl,tl.map(t=>d.tierBreakdown[t]||0)));
+  draw('tiers','chart-tiers',dougCfg(tl,tl.map(t=>(d.tierBreakdown||{})[t]||0)));
 }
 
 // ── BRANDING 品牌设置 ──────────────────────────────
