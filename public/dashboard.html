@@ -32,7 +32,7 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
 .nav-btn{background:transparent;border:1px solid var(--b3);border-radius:20px;padding:5px 14px;color:var(--t2);font-size:12px;transition:all .2s}
 .nav-btn:hover{color:var(--t1)}
 .plan-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;letter-spacing:1px;text-transform:uppercase;background:rgba(216,90,48,0.12);color:var(--gold);border:1px solid rgba(216,90,48,0.25)}
-.page-wrap{max-width:960px;margin:0 auto;width:100%;padding:28px 24px 60px}
+.page-wrap{max-width:960px;margin:0 auto;width:100%;padding:28px 24px 60px;overflow-x:hidden}
 .page-title{font-size:22px;font-weight:500;margin-bottom:4px}
 .page-sub{font-size:13px;color:var(--t2);margin-bottom:28px}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:12px 20px;border-radius:var(--rs);border:none;font-size:14px;font-weight:500;transition:all .2s;cursor:pointer}
@@ -141,7 +141,7 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
 .seg button.on{background:var(--gold);color:#0A0A0A;font-weight:500}
 .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:680px){.chart-grid{grid-template-columns:1fr}}
-.chart-box{position:relative;height:240px;margin-top:8px}
+.chart-box{position:relative;height:240px;margin-top:8px;overflow:hidden}
 .chart-box.sm{height:200px}
 .mini-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
 .mini-stat{background:var(--s2);border:1px solid var(--b2);border-radius:var(--rs);padding:12px 14px}
@@ -185,7 +185,14 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
 .plan-col-sub{font-size:11px;color:var(--t3);margin:2px 0 8px}
 .plan-col ul{list-style:none;margin:0;padding:0;font-size:12px;color:var(--t2);line-height:1.85}
 .plan-col-badge{display:inline-block;margin-top:8px;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--gold);font-weight:600}
-@media(max-width:640px){.plan-compare{grid-template-columns:1fr}}
+@media(max-width:640px){
+  .plan-compare{grid-template-columns:1fr}
+  .page-wrap{padding:20px 10px 60px}
+  .mini-stats{gap:6px}
+  .mini-stat{padding:10px 8px}
+  .mini-stat-val{font-size:22px}
+  .member-table th:nth-child(6),.member-table td:nth-child(6){display:none}
+}
 .feat-row input[type=checkbox]{width:22px;height:22px;accent-color:var(--gold);cursor:pointer;flex-shrink:0}
 .cl-badge{font-size:10px;letter-spacing:.5px;padding:3px 9px;border-radius:20px;white-space:nowrap}
 .cl-ok{background:rgba(74,158,106,0.15);color:var(--green)}
@@ -1066,7 +1073,7 @@ if(window.Chart){Chart.defaults.color='#9A9590';Chart.defaults.font.family="'DM 
 function fmtDay(s){return new Date(s).toLocaleDateString('en-MY',{day:'numeric',month:'short'});}
 function lineCfg(labels,data,color){return{type:'line',data:{labels,datasets:[{data,borderColor:color,backgroundColor:color+'22',fill:true,tension:0.35,pointRadius:0,borderWidth:2}]},options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:6}},y:{beginAtZero:true,grid:{color:'#1E1E1E'},ticks:{precision:0,maxTicksLimit:5}}},maintainAspectRatio:false}};}
 function barCfg(labels,data,color){return{type:'bar',data:{labels,datasets:[{data,backgroundColor:color+'cc',borderRadius:4}]},options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:6}},y:{beginAtZero:true,grid:{color:'#1E1E1E'},ticks:{precision:0,maxTicksLimit:5}}},maintainAspectRatio:false}};}
-function dougCfg(labels,data){return{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:PIE,borderColor:'#141414',borderWidth:2}]},options:{plugins:{legend:{position:'right',labels:{boxWidth:10,padding:8}}},cutout:'62%',maintainAspectRatio:false}};}
+function dougCfg(labels,data){var lp=window.innerWidth<640?'bottom':'right';return{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:PIE,borderColor:'#141414',borderWidth:2}]},options:{plugins:{legend:{position:lp,labels:{boxWidth:10,padding:8}}},cutout:'62%',maintainAspectRatio:false}};}
 function draw(key,canvasId,cfg){if(charts[key])charts[key].destroy();charts[key]=new Chart($(canvasId),cfg);}
 function renderCharts(d){
   draw('stamps','chart-stamps',lineCfg(d.dailyStamps.map(x=>fmtDay(x.date)),d.dailyStamps.map(x=>x.count),GOLD));
