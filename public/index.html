@@ -70,7 +70,8 @@ a{text-decoration:none;color:inherit}
 .why-icon{font-size:32px;color:var(--acc);margin-bottom:12px}
 .why-card h3{font-size:16px;font-weight:600;margin-bottom:6px}
 .why-card p{font-size:13px;color:var(--muted);line-height:1.6}
-.comp-table{max-width:700px;margin:0 auto;border-collapse:collapse;width:100%;font-size:14px}
+.comp-wrap{max-width:700px;margin:0 auto;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.comp-table{width:100%;min-width:520px;border-collapse:collapse;font-size:14px}
 .comp-table th{text-align:left;font-weight:500;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:1px;padding:12px 16px;border-bottom:2px solid rgba(0,0,0,0.08)}
 .comp-table td{padding:14px 16px;border-bottom:1px solid rgba(0,0,0,0.05)}
 .comp-table tr:last-child td{border-bottom:none}
@@ -259,6 +260,7 @@ a{text-decoration:none;color:inherit}
   <div class="container">
     <h2 class="sec-title">Why Choppkar?</h2>
     <p class="sec-sub">See how we compare to paid alternatives.</p>
+    <div class="comp-wrap">
     <table class="comp-table">
       <thead>
         <tr><th>Feature</th><th>Choppkar</th><th>Stamp Me</th><th>Pixalink</th><th>Perkstar</th></tr>
@@ -275,6 +277,7 @@ a{text-decoration:none;color:inherit}
         <tr><td>Security dashboard</td><td class="check"><i class="ti ti-check" aria-hidden="true"></i></td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
       </tbody>
     </table>
+    </div>
     <div class="why-grid">
       <div class="why-card">
         <div class="why-icon"><i class="ti ti-coin-off" aria-hidden="true"></i></div>
