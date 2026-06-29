@@ -6,3 +6,11 @@ _check.js
 .DS_Store
 loyalapp/node_modules/
 package-lock.json
+
+# Project memory & Claude Code session data
+memory/
+.claude/
+
+# Temporary / generated files
+logo-options.html
+choppkar-intro.html
