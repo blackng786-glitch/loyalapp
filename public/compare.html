@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Compare Choppkar vs StoreHub Loyalty vs Stamp Me for Malaysian F&B businesses. Pricing, features, bottle keep, member tiers — an honest side-by-side comparison.">
+<title>Choppkar vs StoreHub vs Stamp Me — Loyalty Program Comparison (2026)</title>
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="canonical" href="https://choppkar.com/compare">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.44.0/dist/tabler-icons.min.css" integrity="sha384-ccZHbezhtZWmNy0cg8odL0D/jFU5k5HIls9y78Qd6lWor7rpvFIZtK0fTFG4z456" crossorigin="anonymous">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--pri:#993C1D;--acc:#D85A30;--light:#FAECE7;--ink:#2C2C2A;--muted:#6E665E;--surface:#FAFAF8;--white:#FFFFFF;--r:12px}
+html{scroll-behavior:smooth}
+body{font-family:'DM Sans',system-ui,sans-serif;color:var(--ink);font-size:16px;line-height:1.6;background:var(--white);overflow-x:hidden}
+a{text-decoration:none;color:inherit}
+.container{max-width:1080px;margin:0 auto;padding:0 24px}
+
+/* Nav */
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(255,255,255,0.92);backdrop-filter:blur(12px);border-bottom:1px solid rgba(0,0,0,0.06)}
+.nav-inner{display:flex;align-items:center;justify-content:space-between;height:64px;max-width:1080px;margin:0 auto;padding:0 24px}
+.nav-logo{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:3px;color:var(--pri)}
+.nav-links{display:flex;align-items:center;gap:28px}
+.nav-links a{font-size:14px;color:var(--muted);transition:color .2s}
+.nav-links a:hover{color:var(--ink)}
+.nav-cta{background:var(--pri);color:var(--white);padding:8px 22px;border-radius:8px;font-size:14px;font-weight:500;transition:background .2s}
+.nav-cta:hover{background:var(--acc)}
+.nav-menu{display:none;background:none;border:none;font-size:24px;color:var(--ink);cursor:pointer}
+
+/* Hero */
+.hero{padding:120px 0 60px;text-align:center;background:linear-gradient(180deg,var(--light) 0%,var(--white) 100%)}
+.hero h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(34px,6vw,56px);letter-spacing:2px;line-height:1.1;color:var(--ink);margin-bottom:16px}
+.hero h1 span{color:var(--acc)}
+.hero-sub{font-size:17px;color:var(--muted);max-width:620px;margin:0 auto;line-height:1.7}
+
+/* Sections */
+.sec{padding:64px 0}
+.sec.alt{background:var(--surface)}
+.sec-title{text-align:center;margin-bottom:12px;font-family:'Bebas Neue',sans-serif;font-size:34px;letter-spacing:2px;color:var(--ink)}
+.sec-sub{text-align:center;font-size:15px;color:var(--muted);max-width:560px;margin:0 auto 40px}
+
+/* Price cards */
+.price-row{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;align-items:stretch}
+.pcard{background:var(--white);border:1.5px solid rgba(0,0,0,0.08);border-radius:16px;padding:30px 24px;display:flex;flex-direction:column;position:relative}
+.pcard.featured{border-color:var(--pri);box-shadow:0 12px 32px rgba(153,60,29,0.12)}
+.pcard-badge{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--pri);color:#fff;padding:5px 16px;border-radius:20px;font-size:12px;font-weight:500;letter-spacing:.5px;white-space:nowrap}
+.pcard-name{font-size:13px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.pcard-price{font-family:'Bebas Neue',sans-serif;font-size:44px;color:var(--pri);letter-spacing:1px;line-height:1;margin:12px 0 2px}
+.pcard-price small{font-size:14px;color:var(--muted);font-family:'DM Sans',sans-serif;letter-spacing:0}
+.pcard-sub{font-size:13px;color:var(--muted);margin-bottom:18px;min-height:38px}
+.pcard ul{list-style:none;text-align:left;margin:0;flex:1}
+.pcard li{padding:7px 0;font-size:14px;display:flex;align-items:flex-start;gap:8px;border-bottom:1px solid rgba(0,0,0,0.04);color:var(--ink)}
+.pcard li:last-child{border-bottom:none}
+.pcard li i{flex:none;margin-top:3px;font-size:16px}
+.i-ok{color:#1D9E75}
+.i-no{color:#C34}
+
+/* Comparison table */
+.comp-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.comp-table{width:100%;min-width:640px;border-collapse:collapse;font-size:14px;background:var(--white);border-radius:var(--r);overflow:hidden}
+.comp-table th{text-align:center;font-weight:600;font-size:13px;padding:14px 12px;border-bottom:2px solid rgba(0,0,0,0.08);background:var(--white)}
+.comp-table th:first-child{text-align:left;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-size:12px}
+.comp-table th.ck-col{background:var(--light);color:var(--pri);font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:1.5px}
+.comp-table td{padding:12px;border-bottom:1px solid rgba(0,0,0,0.05);text-align:center;color:var(--muted)}
+.comp-table td:first-child{text-align:left;color:var(--ink);font-weight:500}
+.comp-table td.ck-col{background:rgba(250,236,231,0.45)}
+.comp-table tr:last-child td{border-bottom:none}
+.check{color:#1D9E75;font-size:18px;font-weight:600}
+.cross{color:#CCC;font-size:18px}
+.note{font-size:12px;color:var(--muted)}
+
+/* Who cards */
+.who-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.who{background:var(--white);border:1px solid rgba(0,0,0,0.06);border-radius:var(--r);padding:28px 24px}
+.who.hl{border-color:var(--pri);background:var(--light)}
+.who h3{font-size:17px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.who h3 i{color:var(--acc)}
+.who p{font-size:14px;color:var(--muted);line-height:1.7}
+
+/* CTA */
+.cta{padding:72px 0;background:var(--pri);text-align:center}
+.cta h2{font-family:'Bebas Neue',sans-serif;font-size:38px;color:var(--white);letter-spacing:2px;margin-bottom:12px}
+.cta p{color:rgba(255,255,255,0.75);font-size:16px;margin-bottom:32px}
+.btn-white{background:var(--white);color:var(--pri);padding:14px 36px;border-radius:10px;font-size:16px;font-weight:600;display:inline-flex;align-items:center;gap:8px;transition:all .2s;border:none;cursor:pointer}
+.btn-white:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.15)}
+
+/* Disclaimer */
+.disclaimer{padding:28px 0;background:var(--surface);font-size:12px;color:var(--muted);text-align:center;line-height:1.7}
+
+/* Footer */
+.footer{padding:40px 0;background:var(--ink);color:rgba(255,255,255,0.5);font-size:13px}
+.footer-inner{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px}
+.footer-logo{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:3px;color:rgba(255,255,255,0.8)}
+.footer-links{display:flex;gap:24px}
+.footer-links a{color:rgba(255,255,255,0.5);transition:color .2s}
+.footer-links a:hover{color:rgba(255,255,255,0.9)}
+
+/* Mobile */
+@media(max-width:768px){
+  .nav-links{display:none}
+  .nav-menu{display:block}
+  .hero{padding:100px 0 48px}
+  .price-row{grid-template-columns:1fr;max-width:420px;margin:0 auto}
+  .who-grid{grid-template-columns:1fr}
+  .comp-table{font-size:13px}
+  .comp-table th,.comp-table td{padding:10px 8px}
+  .footer-inner{flex-direction:column;text-align:center}
+}
+.nav-links.mob-show{display:flex!important;position:fixed;top:64px;left:0;right:0;background:var(--white);flex-direction:column;padding:20px 24px;border-bottom:1px solid rgba(0,0,0,0.08);box-shadow:0 4px 12px rgba(0,0,0,0.06)}
+.nav-links.mob-show .nav-cta{text-align:center}
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">CHOPPKAR</a>
+    <div class="nav-links">
+      <a href="/#how">How it works</a>
+      <a href="/#features">Features</a>
+      <a href="/#pricing">Pricing</a>
+      <a href="/compare">Compare</a>
+      <a href="/dashboard" class="nav-cta">Merchant login</a>
+    </div>
+    <button class="nav-menu" onclick="document.querySelector('.nav-links').classList.toggle('mob-show')" aria-label="Menu"><i class="ti ti-menu-2" aria-hidden="true"></i></button>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="container">
+    <h1>Choppkar vs StoreHub vs Stamp Me<br><span>an honest comparison</span></h1>
+    <p class="hero-sub">Choosing a loyalty program for your cafe, bar, or restaurant in Malaysia? Here's how the three stack up on price and features — including where each one wins.</p>
+  </div>
+</section>
+
+<!-- Pricing comparison -->
+<section class="sec">
+  <div class="container">
+    <h2 class="sec-title">What you'll actually pay</h2>
+    <p class="sec-sub">Entry-level paid plans, compared side by side.</p>
+    <div class="price-row">
+      <div class="pcard featured">
+        <div class="pcard-badge">Best value</div>
+        <div class="pcard-name">Choppkar Pro</div>
+        <div class="pcard-price">RM49<small>/month</small></div>
+        <div class="pcard-sub">Free plan available — start at RM0, upgrade when ready</div>
+        <ul>
+          <li><i class="ti ti-check i-ok"></i> No member limits</li>
+          <li><i class="ti ti-check i-ok"></i> Works standalone — no POS required</li>
+          <li><i class="ti ti-check i-ok"></i> Customers join via QR, no app download</li>
+          <li><i class="ti ti-check i-ok"></i> Self-service — set up in 3 minutes</li>
+        </ul>
+      </div>
+      <div class="pcard">
+        <div class="pcard-name">StoreHub Loyalty</div>
+        <div class="pcard-price">≈RM196<small>/month</small></div>
+        <div class="pcard-sub">Advanced plan RM2,352/year, billed annually</div>
+        <ul>
+          <li><i class="ti ti-x i-no"></i> Requires StoreHub POS system</li>
+          <li><i class="ti ti-x i-no"></i> SMS marketing (Engage) is a separate RM990/year add-on</li>
+          <li><i class="ti ti-check i-ok"></i> Loyalty built into the checkout flow</li>
+          <li><i class="ti ti-check i-ok"></i> LHDN e-Invoice integrated</li>
+        </ul>
+      </div>
+      <div class="pcard">
+        <div class="pcard-name">Stamp Me</div>
+        <div class="pcard-price">≈RM130+<small>/month</small></div>
+        <div class="pcard-sub">From ~US$29/month, higher tiers ~US$49/month</div>
+        <ul>
+          <li><i class="ti ti-x i-no"></i> Customers must download the Stamp Me app</li>
+          <li><i class="ti ti-x i-no"></i> Stamps only — no member tiers</li>
+          <li><i class="ti ti-check i-ok"></i> Established brand, 10+ years in market</li>
+          <li><i class="ti ti-check i-ok"></i> Push notifications included</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Feature matrix -->
+<section class="sec alt">
+  <div class="container">
+    <h2 class="sec-title">Feature by feature</h2>
+    <p class="sec-sub">What each platform includes at its entry paid tier.</p>
+    <div class="comp-wrap">
+      <table class="comp-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th class="ck-col">CHOPPKAR</th>
+            <th>StoreHub Loyalty</th>
+            <th>Stamp Me</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Digital stamp cards</td><td class="ck-col"><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td>No app download for customers</td><td class="ck-col"><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="cross">✗</span></td></tr>
+          <tr><td>Works without buying a POS</td><td class="ck-col"><span class="check">✓</span></td><td><span class="cross">✗</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td>Bottle keep (bar bottle storage)</td><td class="ck-col"><span class="check">✓</span> <span class="note">only platform with this</span></td><td><span class="cross">✗</span></td><td><span class="cross">✗</span></td></tr>
+          <tr><td>Stored vouchers &amp; credit passes</td><td class="ck-col"><span class="check">✓</span></td><td><span class="note">partial (cashback/credit)</span></td><td><span class="cross">✗</span></td></tr>
+          <tr><td>Member tiers with auto-upgrade</td><td class="ck-col"><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="cross">✗</span></td></tr>
+          <tr><td>Referral program on the free plan</td><td class="ck-col"><span class="check">✓</span></td><td><span class="cross">✗</span></td><td><span class="cross">✗</span></td></tr>
+          <tr><td>Push notifications included</td><td class="ck-col"><span class="check">✓</span></td><td><span class="note">add-on (RM990/yr)</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td>Chinese + English + Malay interface</td><td class="ck-col"><span class="check">✓</span></td><td><span class="note">partial</span></td><td><span class="cross">✗</span></td></tr>
+          <tr><td>OTP phone verification for members</td><td class="ck-col"><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="cross">✗</span></td></tr>
+          <tr><td>Multi-branch support</td><td class="ck-col"><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td>Self-service signup (start today)</td><td class="ck-col"><span class="check">✓</span></td><td><span class="note">sales process</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td>Built-in POS &amp; LHDN e-Invoice</td><td class="ck-col"><span class="cross">✗</span></td><td><span class="check">✓</span></td><td><span class="cross">✗</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- Who should choose what -->
+<section class="sec">
+  <div class="container">
+    <h2 class="sec-title">Which one is right for you?</h2>
+    <p class="sec-sub">The honest answer — each platform has a best-fit customer.</p>
+    <div class="who-grid">
+      <div class="who">
+        <h3><i class="ti ti-building-store" aria-hidden="true"></i> Choose StoreHub if…</h3>
+        <p>You also need a full POS system with LHDN e-Invoicing, want loyalty baked into checkout, and a ~RM3,300+/year budget (POS + loyalty + SMS add-on) works for you.</p>
+      </div>
+      <div class="who">
+        <h3><i class="ti ti-award" aria-hidden="true"></i> Choose Stamp Me if…</h3>
+        <p>You want a long-established international brand with a simple punch-card model, and you're confident your customers will download a separate app to collect stamps.</p>
+      </div>
+      <div class="who hl">
+        <h3><i class="ti ti-stamp" aria-hidden="true"></i> Choose Choppkar if…</h3>
+        <p>You run a cafe, bar, KTV, or restaurant and want stamp cards, member tiers, bottle keep, vouchers, and referrals — without buying a POS, without forcing an app on customers, starting free and topping out at RM49/month.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+  <div class="container">
+    <h2>Try the RM0 plan today</h2>
+    <p>Set up your loyalty program in 3 minutes. No credit card, no sales call, no POS required.</p>
+    <a href="/dashboard" class="btn-white"><i class="ti ti-arrow-right" aria-hidden="true"></i> Start free now</a>
+  </div>
+</section>
+
+<!-- Disclaimer -->
+<div class="disclaimer">
+  <div class="container">
+    Pricing and feature information is based on publicly available information from each provider's website as of June 2026 and may have changed — please verify with each provider.<br>
+    StoreHub is a trademark of StoreHub Sdn Bhd. Stamp Me is a trademark of Stamp Media Pty Ltd. Choppkar is not affiliated with either company. USD conversions are approximate.
+  </div>
+</div>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-logo">CHOPPKAR</div>
+      <div class="footer-links">
+        <a href="/dashboard">Merchant login</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="mailto:support@choppkar.com">Contact</a>
+      </div>
+      <div>&copy; 2026 Choppkar. All rights reserved.</div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

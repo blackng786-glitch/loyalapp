@@ -52,5 +52,6 @@ User-agent: *
 Allow: /index.html
 Allow: /card
 Allow: /staff
+Allow: /compare
 Disallow: /api/
 Disallow: /dashboard

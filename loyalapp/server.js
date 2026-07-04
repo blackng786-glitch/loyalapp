@@ -1643,6 +1643,7 @@ app.get('/dashboard', (req, res) => res.sendFile('dashboard.html', { root: 'publ
 app.get('/bottle', (req, res) => res.sendFile('bottle.html', { root: 'public' }));
 app.get('/privacy', (req, res) => res.sendFile('privacy.html', { root: 'public' }));
 app.get('/terms', (req, res) => res.sendFile('terms.html', { root: 'public' }));
+app.get('/compare', (req, res) => res.sendFile('compare.html', { root: 'public' }));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Choppkar running on port ${PORT}`));
