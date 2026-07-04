@@ -23,6 +23,10 @@ const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SEC
 const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID || '';
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '';
 const SMS_FREE_QUOTA = parseInt(process.env.SMS_FREE_QUOTA) || 50;
+// SMS pumping 防护: OTP 只发给白名单国家码 (与 card.html 区号下拉一致)。
+// 诈骗者用高费率国际号码 (+7/+371/+881...) 批量请求 OTP 刷 SMS 分成。
+const OTP_ALLOWED_CC = (process.env.OTP_ALLOWED_CC || '60,65,62,66,63,44,1')
+  .split(',').map(s => s.trim()).filter(Boolean);
 
 const app = express();
 app.set('trust proxy', 1);                 // Railway 反代后取真实客户端 IP (限流用)
@@ -286,6 +290,19 @@ setInterval(() => {
   for (const [ip, until] of banMap) if (now > until) { banMap.delete(ip); ipStrikes.delete(ip); }
 }, 600000);
 
+// ── SECURITY EVENTS RETENTION (只留 30 天) ───────────────────
+// 纯日志表, 无清理会无限增长吃满 Supabase 免费 500MB。
+// 启动后 1 分钟先跑一次: 部署频繁时 24h interval 可能永远到不了。
+// 注意: Supabase query builder 是没有 .catch 的 thenable, 必须 Promise.resolve 包裹。
+function purgeOldSecurityEvents() {
+  const cutoff = new Date(Date.now() - 30 * 86400000).toISOString();
+  Promise.resolve(db.from('security_events').delete().lt('created_at', cutoff))
+    .then(({ error }) => { if (error) console.error('[sec-purge]', error.message); })
+    .catch(e => console.error('[sec-purge]', e.message));
+}
+setTimeout(purgeOldSecurityEvents, 60 * 1000);
+setInterval(purgeOldSecurityEvents, 24 * 3600 * 1000);
+
 // ── WEB PUSH ─────────────────────────────────────────────────
 // Push is optional. A missing/invalid VAPID config must NOT crash the server —
 // setVapidDetails() throws synchronously, so guard it and degrade gracefully.
@@ -467,6 +484,11 @@ app.post('/api/merchant/:slug/upload-logo', async (req, res) => {
 app.post('/api/auth/send-otp', async (req, res) => {
   const { phone, merchantId: otpMerchantId } = req.body;
   if (!phone || phone.length < 8) return res.status(400).json({ error: '请输入有效手机号' });
+  const normPhone = String(phone).replace(/[\s\-().]/g, '');
+  if (!/^\+\d{8,15}$/.test(normPhone) || !OTP_ALLOWED_CC.some(cc => normPhone.startsWith('+' + cc))) {
+    logSec('otp_blocked_cc', 'warn', req.ip, otpMerchantId || null, { prefix: normPhone.slice(0, 4) });
+    return res.status(400).json({ error: '不支持的手机号码区号 / Unsupported country code' });
+  }
   // SMS quota check (per merchant)
   if (otpMerchantId) {
     const quota = await checkSmsQuota(otpMerchantId);
