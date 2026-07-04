@@ -14,3 +14,6 @@ memory/
 # Temporary / generated files
 logo-options.html
 choppkar-intro.html
+
+# Marketing assets (business materials, not code)
+marketing/
