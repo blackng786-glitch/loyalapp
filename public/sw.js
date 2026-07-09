@@ -1,4 +1,4 @@
-const CACHE = 'choppkar-v8';
+const CACHE = 'choppkar-v9';
 const ASSETS = ['/card', '/staff', '/icons/icon-192.png'];
 
 self.addEventListener('install', e => {

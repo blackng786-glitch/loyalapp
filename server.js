@@ -247,6 +247,12 @@ setInterval(() => {  // 每小时清理过期 key, 防内存增长
 }, 3600000);
 
 // ── SECURITY EVENT LOGGING ──────────────────────────────────
+// PDPA: never store full phone numbers in logs. Keep only the last 3 digits
+// so an event is still correlatable without being personal data.
+function maskPhone(p) {
+  const s = String(p || '');
+  return s.length <= 3 ? '***' : '****' + s.slice(-3);
+}
 function logSec(type, severity, ip, merchantId, details) {
   db.from('security_events').insert({
     event_type: type, severity, ip: ip || null,
@@ -495,8 +501,8 @@ app.post('/api/auth/send-otp', async (req, res) => {
     if (!quota.allowed) return res.status(402).json({ error: `SMS quota exceeded (${quota.used}/${quota.limit} this month). Upgrade to Pro for unlimited.`, code: 'SMS_QUOTA' });
   }
   // 限流: 防短信轰炸 + 控制 SMS 成本
-  if (!rateOk('otp:p1:' + phone, 60 * 1000, 1))        { recordStrike(req.ip); logSec('rate_limit', 'warn', req.ip, null, { type: 'otp_send', phone }); return res.status(429).json({ error: '发送太频繁，请 1 分钟后再试' }); }
-  if (!rateOk('otp:pd:' + phone, 24 * 3600 * 1000, 8)) { recordStrike(req.ip); logSec('rate_limit', 'warn', req.ip, null, { type: 'otp_daily', phone }); return res.status(429).json({ error: '该号码今日发送次数已达上限' }); }
+  if (!rateOk('otp:p1:' + phone, 60 * 1000, 1))        { recordStrike(req.ip); logSec('rate_limit', 'warn', req.ip, null, { type: 'otp_send', phone: maskPhone(phone) }); return res.status(429).json({ error: '发送太频繁，请 1 分钟后再试' }); }
+  if (!rateOk('otp:pd:' + phone, 24 * 3600 * 1000, 8)) { recordStrike(req.ip); logSec('rate_limit', 'warn', req.ip, null, { type: 'otp_daily', phone: maskPhone(phone) }); return res.status(429).json({ error: '该号码今日发送次数已达上限' }); }
   if (!rateOk('otp:ip:' + req.ip, 3600 * 1000, 15))    { recordStrike(req.ip); logSec('rate_limit', 'critical', req.ip, null, { type: 'otp_ip_flood' }); return res.status(429).json({ error: '请求过于频繁，请稍后再试' }); }
   try {
     const { error } = await authClient.auth.signInWithOtp({ phone });
@@ -513,10 +519,10 @@ app.post('/api/auth/verify-otp', async (req, res) => {
   const { phone, token, merchantId } = req.body;
   if (!phone || !token) return res.status(400).json({ error: 'phone and token required' });
   // 限流: 6 位验证码防暴力穷举
-  if (!rateOk('otp:vf:' + phone, 3600 * 1000, 10)) { recordStrike(req.ip); logSec('rate_limit', 'critical', req.ip, null, { type: 'otp_verify_brute', phone }); return res.status(429).json({ error: '尝试次数过多，请稍后再试' }); }
+  if (!rateOk('otp:vf:' + phone, 3600 * 1000, 10)) { recordStrike(req.ip); logSec('rate_limit', 'critical', req.ip, null, { type: 'otp_verify_brute', phone: maskPhone(phone) }); return res.status(429).json({ error: '尝试次数过多，请稍后再试' }); }
   try {
     const { error } = await authClient.auth.verifyOtp({ phone, token, type: 'sms' });
-    if (error) { logSec('otp_fail', 'info', req.ip, null, { phone }); return res.status(400).json({ error: error.message }); }
+    if (error) { logSec('otp_fail', 'info', req.ip, null, { phone: maskPhone(phone) }); return res.status(400).json({ error: error.message }); }
 
     // 查 members 表找这个 phone 的会员
     let member = null, total_stamps = 0;

@@ -301,6 +301,10 @@ input,select,button{font-family:'DM Sans',sans-serif}button{cursor:pointer}
         <label class="label" for="nn-name">Your Name 姓名</label>
         <input class="input" id="nn-name" type="text" placeholder="Ahmad bin Abdullah" autocomplete="name" maxlength="100" style="font-size:16px">
       </div>
+      <label for="nn-consent" style="display:flex;gap:9px;align-items:flex-start;font-size:12px;color:var(--t2);cursor:pointer;line-height:1.5">
+        <input type="checkbox" id="nn-consent" style="margin-top:2px;flex:none;width:17px;height:17px;accent-color:var(--brand)">
+        <span>I agree to the <a href="/privacy" target="_blank" rel="noopener" style="color:var(--brand)">Privacy Policy</a> &amp; <a href="/terms" target="_blank" rel="noopener" style="color:var(--brand)">Terms</a>, and consent to my name and phone number being used for this loyalty program. 我同意隐私政策与条款，并同意商家使用我的姓名与电话号码。</span>
+      </label>
       <div id="nn-err" class="err-text"></div>
       <button class="btn btn-brand" id="nn-btn" onclick="completeRegistration()">
         <i class="ti ti-check" aria-hidden="true"></i> 完成注册
@@ -604,6 +608,7 @@ async function completeRegistration(){
   const name=$('nn-name').value.trim();
   $('nn-err').textContent='';
   if(!name){$('nn-err').textContent=t('请输入姓名');return;}
+  if(!$('nn-consent').checked){$('nn-err').textContent=t('请先同意隐私政策与用户条款 / Please accept the Privacy Policy & Terms');return;}
   const btn=$('nn-btn');btn.disabled=true;btn.textContent=t('注册中...');
   try{
     const res=await fetch(API+'/api/member',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,phone:S.otpPhone,merchantId:S.merchant.id,regTicket:S.regTicket})});

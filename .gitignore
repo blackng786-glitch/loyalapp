@@ -17,3 +17,6 @@ choppkar-intro.html
 
 # Marketing assets (business materials, not code)
 marketing/
+
+# Data backups (contain real customer PII — never commit)
+backups/
