@@ -37,8 +37,28 @@ app.use(cors({
     : (origin, cb) => cb(null, !origin || origin === `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` || /^https?:\/\/localhost(:\d+)?$/.test(origin || '')),
   credentials: true,
 }));
+// Content-Security-Policy. The frontend has 100+ inline event handlers, so a
+// strict nonce policy would mean rewriting all of them — instead we keep
+// 'unsafe-inline' for scripts but lock down the directives that actually stop
+// an XSS from doing damage: connect-src (blocks token exfiltration to attacker
+// hosts), object-src/base-uri/frame-ancestors (plugin/base-tag/clickjacking).
+const SUPA_HOST = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
 app.use(helmet({
-  contentSecurityPolicy: false,            // 前端 inline script 需要; XSS 由 esc() 手动防
+  contentSecurityPolicy: {
+    useDefaults: false,
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://cdnjs.cloudflare.com'],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://cdn.jsdelivr.net'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com', 'https://cdn.jsdelivr.net', 'data:'],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      connectSrc: ["'self'", 'https://*.supabase.co', SUPA_HOST].filter(Boolean),
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      frameAncestors: ["'self'"],
+      formAction: ["'self'"],
+    },
+  },
   crossOriginEmbedderPolicy: false,        // 允许外部 CDN 资源加载
 }));
 // Stripe webhook needs raw body — must be before express.json()
