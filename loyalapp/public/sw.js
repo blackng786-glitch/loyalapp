@@ -1,4 +1,4 @@
-const CACHE = 'choppkar-v9';
+const CACHE = 'choppkar-v10';
 const ASSETS = ['/card', '/staff', '/icons/icon-192.png'];
 
 self.addEventListener('install', e => {
@@ -17,12 +17,17 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  if (e.request.url.includes('/api/')) return;
+  const url = new URL(e.request.url);
+  // Only handle same-origin requests. Cross-origin assets (CDN scripts,
+  // Google Fonts) must load directly so the browser applies script-src/
+  // style-src — re-fetching them here runs into connect-src and breaks them.
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.includes('/api/')) return;
   e.respondWith(
     fetch(e.request)
       .then(res => {
         const clone = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone));
+        caches.open(CACHE).then(c => c.put(e.request, clone).catch(() => {}));
         return res;
       })
       .catch(() => caches.match(e.request))

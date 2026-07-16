@@ -48,11 +48,17 @@ app.use(helmet({
     useDefaults: false,
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://cdnjs.cloudflare.com'],
+      scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://cdnjs.cloudflare.com', 'https://static.cloudflareinsights.com'],
       styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://cdn.jsdelivr.net'],
       fontSrc: ["'self'", 'https://fonts.gstatic.com', 'https://cdn.jsdelivr.net', 'data:'],
       imgSrc: ["'self'", 'data:', 'https:'],
-      connectSrc: ["'self'", 'https://*.supabase.co', SUPA_HOST].filter(Boolean),
+      // connect-src must also allow the CDN/font hosts: the service worker
+      // re-fetches those assets, and SW fetch() is governed by connect-src.
+      // Still blocks token exfiltration to arbitrary attacker domains.
+      connectSrc: ["'self'", 'https://*.supabase.co', SUPA_HOST,
+        'https://cdn.jsdelivr.net', 'https://cdnjs.cloudflare.com',
+        'https://fonts.googleapis.com', 'https://fonts.gstatic.com',
+        'https://static.cloudflareinsights.com'].filter(Boolean),
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
       frameAncestors: ["'self'"],
