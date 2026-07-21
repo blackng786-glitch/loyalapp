@@ -458,7 +458,7 @@ function getPhone(ccId,phId){
 }
 
 // ── SESSION (30-day expiry, 含服务端签发的登录 token) ─────────
-const SESSION_DAYS=90;
+const SESSION_DAYS=365;
 function saveSession(member,token){
   const session={memberId:member.id,phone:member.phone,name:member.name,token:token||S.token,expiresAt:Date.now()+SESSION_DAYS*86400000};
   try{
