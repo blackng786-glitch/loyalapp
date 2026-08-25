@@ -512,12 +512,79 @@ app.post('/api/merchant/:slug/upload-logo', async (req, res) => {
   }
 });
 
+// ── PHONE HELPERS (shared by OTP signup and phone-only login) ──
+const normalizePhone = p => String(p || '').replace(/[\s\-().]/g, '');
+const phoneCcAllowed = p =>
+  /^\+\d{8,15}$/.test(p) && OTP_ALLOWED_CC.some(cc => p.startsWith('+' + cc));
+
+// Exact phone match first, then fall back to the last 9 digits so members
+// stored under a different country-code format still resolve.
+async function findMemberByPhone(merchantId, phone) {
+  if (!merchantId || !phone) return { member: null, total_stamps: 0 };
+  let member = null;
+  const { data: exact } = await db.from('members').select('*')
+    .eq('merchant_id', merchantId).eq('phone', phone).maybeSingle();
+  if (exact) {
+    member = exact;
+  } else {
+    const tail = String(phone).replace(/\D/g, '').slice(-9);
+    const { data: rows } = await db.from('members').select('*')
+      .eq('merchant_id', merchantId).ilike('phone', '%' + tail).limit(1);
+    member = rows?.[0] || null;
+  }
+  let total_stamps = 0;
+  if (member) {
+    const { count } = await db.from('stamps')
+      .select('*', { count: 'exact', head: true }).eq('member_id', member.id);
+    total_stamps = count || 0;
+  }
+  return { member, total_stamps };
+}
+
+// ── RETURNING-MEMBER LOGIN (phone only, no SMS) ──────────────
+// Members verify by OTP once at signup and never again: this hands an existing
+// member their token straight from the phone number. Tradeoff: anyone knowing
+// the number can read that member's card and self-redeem stamp rewards. Bottle
+// pours and voucher spends stay staff-only, so stored value can't be taken this
+// way. Rate limits blunt number enumeration.
+app.post('/api/auth/login-phone', async (req, res) => {
+  const { phone, merchantId } = req.body;
+  if (!phone || !merchantId) return res.status(400).json({ error: 'phone and merchantId required' });
+  const normPhone = normalizePhone(phone);
+  if (!phoneCcAllowed(normPhone)) {
+    logSec('otp_blocked_cc', 'warn', req.ip, merchantId, { prefix: normPhone.slice(0, 4) });
+    return res.status(400).json({ error: '不支持的手机号码区号 / Unsupported country code' });
+  }
+  if (!rateOk('lp:ip:' + req.ip, 3600 * 1000, 20)) {
+    recordStrike(req.ip);
+    logSec('rate_limit', 'critical', req.ip, merchantId, { type: 'phone_login_enum' });
+    return res.status(429).json({ error: '请求过于频繁，请稍后再试' });
+  }
+  if (!rateOk('lp:p:' + normPhone, 3600 * 1000, 10)) {
+    recordStrike(req.ip);
+    logSec('rate_limit', 'warn', req.ip, merchantId, { type: 'phone_login', phone: maskPhone(normPhone) });
+    return res.status(429).json({ error: '尝试次数过多，请稍后再试' });
+  }
+  try {
+    const { member, total_stamps } = await findMemberByPhone(merchantId, normPhone);
+    if (!member) return res.json({ exists: false });   // caller falls through to OTP signup
+    res.json({
+      exists: true,
+      member: { ...member, total_stamps },
+      token: memberToken(member.id, merchantId),
+    });
+  } catch (e) {
+    console.error('[login-phone]', e.message);
+    res.status(500).json({ error: '服务异常，请稍后再试' });
+  }
+});
+
 // ── CUSTOMER OTP AUTH (Supabase Phone OTP) ───────────────────
 app.post('/api/auth/send-otp', async (req, res) => {
   const { phone, merchantId: otpMerchantId } = req.body;
   if (!phone || phone.length < 8) return res.status(400).json({ error: '请输入有效手机号' });
-  const normPhone = String(phone).replace(/[\s\-().]/g, '');
-  if (!/^\+\d{8,15}$/.test(normPhone) || !OTP_ALLOWED_CC.some(cc => normPhone.startsWith('+' + cc))) {
+  const normPhone = normalizePhone(phone);
+  if (!phoneCcAllowed(normPhone)) {
     logSec('otp_blocked_cc', 'warn', req.ip, otpMerchantId || null, { prefix: normPhone.slice(0, 4) });
     return res.status(400).json({ error: '不支持的手机号码区号 / Unsupported country code' });
   }
@@ -551,26 +618,7 @@ app.post('/api/auth/verify-otp', async (req, res) => {
     if (error) { logSec('otp_fail', 'info', req.ip, null, { phone: maskPhone(phone) }); return res.status(400).json({ error: error.message }); }
 
     // 查 members 表找这个 phone 的会员
-    let member = null, total_stamps = 0;
-    if (merchantId) {
-      // 精确匹配
-      const { data: m } = await db.from('members').select('*')
-        .eq('merchant_id', merchantId).eq('phone', phone).maybeSingle();
-      if (!m) {
-        // 模糊匹配: 去掉国际码最后9位
-        const tail = phone.replace(/\D/g, '').slice(-9);
-        const { data: rows } = await db.from('members').select('*')
-          .eq('merchant_id', merchantId).ilike('phone', '%' + tail).limit(1);
-        member = rows?.[0] || null;
-      } else {
-        member = m;
-      }
-      if (member) {
-        const { count } = await db.from('stamps')
-          .select('*', { count: 'exact', head: true }).eq('member_id', member.id);
-        total_stamps = count || 0;
-      }
-    }
+    const { member, total_stamps } = await findMemberByPhone(merchantId, phone);
     // OTP 通过 → 签发凭证: 老会员发 30 天登录 token, 新会员发 15 分钟注册票据
     res.json({
       success: true, isNew: !member,
