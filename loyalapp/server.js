@@ -599,13 +599,51 @@ app.post('/api/auth/send-otp', async (req, res) => {
   if (!rateOk('otp:ip:' + req.ip, 3600 * 1000, 15))    { recordStrike(req.ip); logSec('rate_limit', 'critical', req.ip, null, { type: 'otp_ip_flood' }); return res.status(429).json({ error: '请求过于频繁，请稍后再试' }); }
   try {
     const { error } = await authClient.auth.signInWithOtp({ phone });
-    if (error) return res.status(400).json({ error: error.message });
+    if (error) {
+      // Record the provider's reason so a merchant can see WHY a customer
+      // never got their code (trial restriction, carrier reject, geo block…).
+      logSec('otp_send_fail', 'warn', req.ip, otpMerchantId || null,
+        { phone: maskPhone(normPhone), reason: String(error.message || 'unknown').slice(0, 300) });
+      return res.status(400).json({ error: error.message });
+    }
+    logSec('otp_sent', 'info', req.ip, otpMerchantId || null, { phone: maskPhone(normPhone) });
     if (otpMerchantId) incrementSmsCount(otpMerchantId).catch(e => console.error('[sms-count]', e.message));
     res.json({ success: true });
   } catch (e) {
     console.error('[send-otp]', e.message);
+    logSec('otp_send_fail', 'warn', req.ip, otpMerchantId || null,
+      { phone: maskPhone(normPhone), reason: 'server error: ' + String(e.message || '').slice(0, 200) });
     res.status(500).json({ error: '服务异常，请稍后再试' });
   }
+});
+
+// ── OTP SEND LOG (商家排查"顾客收不到验证码") ────────────────────
+// Accepted-by-provider ≠ delivered to the handset: this shows what our side
+// attempted and what the provider said. Final delivery status lives in Twilio.
+app.get('/api/otp-log/:merchantId', async (req, res) => {
+  const m = await requireMerchant(req, res, req.params.merchantId);
+  if (!m) return;
+  const days = Math.min(parseInt(req.query.days) || 7, 30);
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+  const { data } = await db.from('security_events')
+    .select('event_type,details,created_at')
+    .in('event_type', ['otp_sent', 'otp_send_fail', 'otp_fail', 'otp_blocked_cc'])
+    .or(`merchant_id.eq.${m.id},merchant_id.is.null`)
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(100);
+  const rows = (data || []).map(e => ({
+    at: e.created_at,
+    type: e.event_type,
+    phone: e.details?.phone || (e.details?.prefix ? e.details.prefix + '…' : '—'),
+    reason: e.details?.reason || null,
+  }));
+  res.json({
+    rows,
+    sent: rows.filter(r => r.type === 'otp_sent').length,
+    failed: rows.filter(r => r.type === 'otp_send_fail').length,
+    wrongCode: rows.filter(r => r.type === 'otp_fail').length,
+  });
 });
 
 app.post('/api/auth/verify-otp', async (req, res) => {

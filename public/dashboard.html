@@ -635,6 +635,30 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}button{cursor:poin
       </div>
     </div>
 
+    <!-- SMS / OTP LOG -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div class="card-title" style="margin-bottom:0"><i class="ti ti-message-2-check" style="margin-right:6px;color:var(--gold)" aria-hidden="true"></i>SMS / OTP Log</div>
+        <select class="input" id="otp-days" style="width:auto;padding:6px 10px;font-size:12px" onchange="loadOtpLog()">
+          <option value="1">Today</option>
+          <option value="7" selected>7 days</option>
+          <option value="30">30 days</option>
+        </select>
+      </div>
+      <div class="stats-grid" style="margin-bottom:16px">
+        <div class="stat" style="border-left:3px solid var(--green)"><div class="stat-lbl">Sent</div><div class="stat-val" id="otp-sent" style="color:var(--green)">-</div></div>
+        <div class="stat" style="border-left:3px solid #E24B4A"><div class="stat-lbl">Send failed</div><div class="stat-val" id="otp-failed" style="color:#E24B4A">-</div></div>
+        <div class="stat" style="border-left:3px solid #EF9F27"><div class="stat-lbl">Wrong code</div><div class="stat-val" id="otp-wrong" style="color:#EF9F27">-</div></div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="members-table" style="font-size:12px">
+          <thead><tr><th>Time</th><th>Phone</th><th>Status</th><th>Reason</th></tr></thead>
+          <tbody id="otp-tbody"><tr><td colspan="4" class="empty-sm">Loading...</td></tr></tbody>
+        </table>
+      </div>
+      <p style="font-size:11px;color:var(--t3);margin-top:10px">"Sent" means the SMS provider accepted the request. Whether it reached the handset is shown in the Twilio message log.</p>
+    </div>
+
     <!-- SECURITY MONITOR -->
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -877,6 +901,7 @@ async function showDashboard(){
   loadBranches();
   loadScheduled();
   loadAnalytics();
+  loadOtpLog();
   loadSecurityEvents();
   loadBilling();
   loadAutoCampaigns();
@@ -1094,6 +1119,27 @@ function renderCharts(d){
 
 // ── BRANDING 品牌设置 ──────────────────────────────
 // ── SECURITY MONITOR ──────────────────────────────────────
+async function loadOtpLog(){
+  const days=$('otp-days').value||7;
+  const LABEL={otp_sent:'Sent',otp_send_fail:'Send failed',otp_fail:'Wrong code',otp_blocked_cc:'Blocked (country)'};
+  const COLOR={otp_sent:'var(--green)',otp_send_fail:'#E24B4A',otp_fail:'#EF9F27',otp_blocked_cc:'#EF9F27'};
+  try{
+    const d=await fetch(API+'/api/otp-log/'+S.merchant.id+'?days='+days).then(r=>r.json());
+    $('otp-sent').textContent=d.sent||0;
+    $('otp-failed').textContent=d.failed||0;
+    $('otp-wrong').textContent=d.wrongCode||0;
+    const rows=d.rows||[];
+    const tb=$('otp-tbody');
+    if(!rows.length){tb.innerHTML='<tr><td colspan="4" class="empty-sm">No OTP activity in this period</td></tr>';return;}
+    tb.innerHTML=rows.map(function(r){
+      return '<tr><td>'+new Date(r.at).toLocaleString()+'</td>'+
+        '<td>'+esc(r.phone)+'</td>'+
+        '<td style="color:'+(COLOR[r.type]||'var(--t2)')+'">'+(LABEL[r.type]||esc(r.type))+'</td>'+
+        '<td style="max-width:340px;white-space:normal">'+(r.reason?esc(r.reason):'—')+'</td></tr>';
+    }).join('');
+  }catch(e){$('otp-tbody').innerHTML='<tr><td colspan="4" class="empty-sm">Failed to load</td></tr>';}
+}
+
 async function loadSecurityEvents(){
   const days=$('sec-days').value||7;
   try{
